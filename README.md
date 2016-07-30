@@ -1,0 +1,2 @@
+# laragen
+laravel generator
