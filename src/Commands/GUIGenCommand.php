@@ -5,15 +5,14 @@ namespace Motia\Generator\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 
-class GenerateAllCommand extends Command
+class GUIGenCommand extends Command
 {
-    use ArtisanCommandTrait;
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'motia:generate';
+    protected $signature = 'motia:guigen';
 
     /**
      * The console command description.
@@ -39,7 +38,9 @@ class GenerateAllCommand extends Command
      */
     public function handle()
     {
-        
+        $generatorOptions = ['paginate' => '15', 'skip' => 'dump-autoload'];
+        $generatorAddOns = ['swagger' => true, 'datatable' => true];
+
         $filesystem = new Filesystem;
         $migrationFiles = glob('database/migrations/*.php');
         foreach ($migrationFiles as $migFile) {
@@ -47,30 +48,38 @@ class GenerateAllCommand extends Command
                 $filesystem->delete($migFile);
         }
 
-        $directory = 'storage/myschema/table_descrp/';
+        $directory = 'resources/model_schemas/';
 
         $jsonFiles = $filesystem->glob($directory.'*.json');
-        
 
         foreach($jsonFiles as $file){
+
+            $fileContents = file_get_contents($file);
+            $jsonData = json_decode($fileContents, true);
+
+            $jsonData = [
+                'migrate' => true,
+                'fields' => $jsonData,
+                'options' => $generatorOptions,
+                'addOns' => $generatorAddOns,
+            ];
+            
             $fileName = $filesystem->name($file);
 
             $model = studly_case(str_singular($fileName));
             $tableName = $fileName;
-            
+
             $options = [
                     'model' => $model,
-                    '--fieldsFile' => $file,
-                    '--tableName' => $tableName,
-                    '--skip' => 'dump-autoload',
-                    '--paginate' => 15,
-                    '-n' => null
+                    '--jsonFromGUI' => json_encode($jsonData),
                 ];
 
             $command = 'infyom:api_scaffold';
-            $output = $this->executeArtisanCommand($command, $options);        
-            echo $output;
+            $output = $this->call($command, $options);
         }
+
+        // project specific
+        // copies some migrations files
 
         $directory = 'storage/myschema/post_migrations/';
         $filesToCopy = $filesystem->glob($directory.'*.php');
@@ -79,7 +88,5 @@ class GenerateAllCommand extends Command
             $filesystem->copy($file, 'database/migrations/' . date('Y_m_d_His')  . '_' . basename($file));
         }        
     }
-
-
 
 }

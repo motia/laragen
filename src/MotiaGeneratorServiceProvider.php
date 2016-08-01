@@ -5,6 +5,7 @@ namespace Motia\Generator;
 use Illuminate\Support\ServiceProvider;
 use Motia\Generator\Commands\GenerateAllCommand;
 use Motia\Generator\Commands\DummyCommand;
+use Motia\Generator\Commands\GUIGenCommand;
 
 
 class MotiaGeneratorServiceProvider extends ServiceProvider
@@ -38,9 +39,14 @@ class MotiaGeneratorServiceProvider extends ServiceProvider
             return new DummyCommand();
         });
 
+        $this->app->singleton('motia:guigen', function ($app) {
+            return new GUIGenCommand();
+        });
+
         $this->commands([
             'motia:generate',
-            'motia:dummy'
+            'motia:guigen',
+            'motia:dummy',
         ]);
     }
 }
