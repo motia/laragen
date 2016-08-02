@@ -4,6 +4,9 @@ namespace Motia\Generator\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use Motia\Generator\Utils\GeneratorRelationshipInputUtil;
+use RuntimeException;
+use Exception;
 
 class GUIGenCommand extends Command
 {
@@ -38,55 +41,90 @@ class GUIGenCommand extends Command
      */
     public function handle()
     {
+
+        $command = 'infyom:api_scaffold';
         $generatorOptions = ['paginate' => '15', 'skip' => 'dump-autoload'];
         $generatorAddOns = ['swagger' => true, 'datatable' => true];
 
         $filesystem = new Filesystem;
         $migrationFiles = glob('database/migrations/*.php');
-        foreach ($migrationFiles as $migFile) {
-            if( !str_contains($migFile, 'create_users_table') && !str_contains($migFile, 'create_password_resets_table') )
-                $filesystem->delete($migFile);
+
+        // delete all generated migration files
+        foreach ($migrationFiles as $migrationFile) {
+            if (!str_contains($migrationFile, 'create_users_table') && !str_contains($migrationFile, 'create_password_resets_table'))
+                $filesystem->delete($migrationFile);
         }
 
-        $directory = 'resources/model_schemas/';
+        $schemaFilesDirectory = 'resources/model_schemas/';
+        $schemaFiles = $filesystem->glob($schemaFilesDirectory . '*.json');
 
-        $jsonFiles = $filesystem->glob($directory.'*.json');
+        $fieldInputsArray = [];
+        $relationships = [];
 
-        foreach($jsonFiles as $file){
+        // prepare each model from its schemaFile
+        foreach ($schemaFiles as $file) {
+            var_dump('Log(file) = '. $file);
+
+            $schemaModel = studly_case(str_singular($filesystem->name($file)));
 
             $fileContents = file_get_contents($file);
+
             $jsonData = json_decode($fileContents, true);
+            // returns $model => [$fk1, $fk2...]
+            $pulledRelationships = GeneratorRelationshipInputUtil::pullRelationships($jsonData);
+            $foreignKeyInputFields = GeneratorRelationshipInputUtil::deduceForeignKeys($pulledRelationships) ;
+            $relationships += $pulledRelationships;
+
+            foreach ($foreignKeyInputFields as $foreignKey) {
+                $fkName = $foreignKey['fieldName'];
+                $modelName = array_pull($foreignKey, 'modelName');
+                // adds field options to the deduced foreign keys
+                // options have less priority than the inputFields options
+                $fieldInputsArray[$modelName][$fkName] += $foreignKey;
+            }
+
+
+            foreach ($jsonData as $fieldInput) {
+                $fieldInputName = strtok($fieldInput['fieldInput'], ':');
+
+                if(isset($fieldInputsArray[$schemaModel][$fieldInputName]))
+                    $oldInputField = $fieldInputsArray[$schemaModel][$fieldInputName];
+                else $oldInputField = [];
+
+                $fieldInputsArray[$schemaModel][$fieldInputName] = $fieldInput + $oldInputField;
+            }
+        }
+
+        // remove keys for input fields
+        $fieldInputsArray = array_map('array_values', $fieldInputsArray);
+        //dd($fieldInputsArray);
+        foreach ($fieldInputsArray as $model => $fieldInputs){
+            var_dump("Log(model=$model)");
 
             $jsonData = [
                 'migrate' => true,
-                'fields' => $jsonData,
+                'fields' => $fieldInputs,
                 'options' => $generatorOptions,
                 'addOns' => $generatorAddOns,
             ];
-            
-            $fileName = $filesystem->name($file);
-
-            $model = studly_case(str_singular($fileName));
-            $tableName = $fileName;
 
             $options = [
-                    'model' => $model,
-                    '--jsonFromGUI' => json_encode($jsonData),
-                ];
-
-            $command = 'infyom:api_scaffold';
-            $output = $this->call($command, $options);
+                'model' => $model,
+                '--jsonFromGUI' => json_encode($jsonData),
+            ];
+            
+            $this->call($command, $options);
         }
 
         // project specific
         // copies some migrations files
 
-        $directory = 'storage/myschema/post_migrations/';
-        $filesToCopy = $filesystem->glob($directory.'*.php');
+        $postMigrationsDirectory = 'storage/myschema/post_migrations/';
+        $filesToCopy = $filesystem->glob($postMigrationsDirectory . '*.php');
 
-        foreach($filesToCopy as $file){
-            $filesystem->copy($file, 'database/migrations/' . date('Y_m_d_His')  . '_' . basename($file));
-        }        
+        foreach ($filesToCopy as $file) {
+            $filesystem->copy($file, 'database/migrations/' . date('Y_m_d_His') . '_' . basename($file));
+        }
     }
 
 }
