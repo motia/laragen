@@ -31,6 +31,7 @@ trait GeneratorRelationshipInputUtilTrait
 
         return $arrStr;
     }
+    
     /**
      * @param $jsonData
      * @return mixed
@@ -47,7 +48,20 @@ trait GeneratorRelationshipInputUtilTrait
         return $pulledRelationships;
     }
 
-    public static function deduceForeignKeys($pulledRelationships){
-        return [];
+    public static function pullForeignKeysColumn($pulledRelationships){
+        return array_map(
+                function ($relationship){
+                        return array_pull($relationship, 'fk');
+                }
+                , $pulledRelationships);
     }
+
+    public static function validateForeignKeyInput(){
+
+    }
+
+    public function replaceByEmptyIfNull($var){
+        return isset($var) ? $var : '';
+    }
+
 }

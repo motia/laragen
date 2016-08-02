@@ -48,6 +48,7 @@ class GUIGenCommand extends Command
 
         $filesystem = new Filesystem;
         $migrationFiles = glob('database/migrations/*.php');
+        $primaryKeys = [];
 
         // delete all generated migration files
         foreach ($migrationFiles as $migrationFile) {
@@ -70,9 +71,10 @@ class GUIGenCommand extends Command
             $fileContents = file_get_contents($file);
 
             $jsonData = json_decode($fileContents, true);
-            // returns $model => [$fk1, $fk2...]
+
+            // returns $model => [$relationship1, $relationship2...]
             $pulledRelationships = GeneratorRelationshipInputUtil::pullRelationships($jsonData);
-            $foreignKeyInputFields = GeneratorRelationshipInputUtil::deduceForeignKeys($pulledRelationships) ;
+            $foreignKeyInputFields = GeneratorRelationshipInputUtil::pullForeignKeysColumn($pulledRelationships) ;
             $relationships += $pulledRelationships;
 
             foreach ($foreignKeyInputFields as $foreignKey) {
@@ -82,7 +84,6 @@ class GUIGenCommand extends Command
                 // options have less priority than the inputFields options
                 $fieldInputsArray[$modelName][$fkName] += $foreignKey;
             }
-
 
             foreach ($jsonData as $fieldInput) {
                 $fieldInputName = strtok($fieldInput['fieldInput'], ':');

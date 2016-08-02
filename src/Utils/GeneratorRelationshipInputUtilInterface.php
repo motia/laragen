@@ -9,5 +9,5 @@ interface GeneratorRelationshipInputUtilInterface
     public static function processRelationshipInput($relationshipInput, $htmlType, $validations, $fieldSettings = []);
     public static function validateRelationshipInput($relationInput);
     public static function pullRelationships(&$jsonData);
-    public static function deduceForeignKeys($pulledRelationships);
+    public static function pullForeignKeysColumn($pulledRelationships);
 }
