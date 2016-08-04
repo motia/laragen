@@ -3,10 +3,9 @@
 namespace Motia\Generator;
 
 use Illuminate\Support\ServiceProvider;
-use Motia\Generator\Commands\GenerateAllCommand;
 use Motia\Generator\Commands\DummyCommand;
+use Motia\Generator\Commands\GenerateAllCommand;
 use Motia\Generator\Commands\GUIGenCommand;
-
 
 class MotiaGeneratorServiceProvider extends ServiceProvider
 {

@@ -40,5 +40,4 @@ class DummyCommand extends Command
     {
         echo 'Today, I don\'t have to be a Murloc :)';
     }
-
 }

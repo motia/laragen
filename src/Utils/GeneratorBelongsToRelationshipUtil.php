@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUtilInterface
 {
     use GeneratorRelationshipInputUtilTrait;
-    
+
     public static function validateRelationship($relationship)
     {
         if (isset($relationship['htmlType'])) {
@@ -53,7 +53,7 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
             'inForm'     => $inForm,
             'inIndex'    => $inIndex,
         ];
-        
+
         return
             self::processRelationshipInput($relationship['relationshipInput'], $htmlType, $validations, $relationshipSettings);
     }
@@ -65,13 +65,15 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
         if (count($fieldInputs) < 2 || $fieldInputs[0] == 'belongsTo') {
             return false;
         }
+
         return true;
     }
 
     public static function processRelationshipInput($relationshipInput,
                                                     $htmlType,
                                                     $validations,
-                                                    $relationshipSettings = []){
+                                                    $relationshipSettings = [])
+    {
         $relationshipInputs = explode(':', $relationshipInput);
 
         // modelname ; relationtype,relatedModel,fk1,fk2; eloquentinput1 ; eloquentinput2 ...
@@ -94,7 +96,7 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
             $relationshipSettings['fkFields'][0] : [];
 
         // TODO
-        $processedFKField = self::validateForeignKeyField($fkField, $modelName, $referencedModel, $referencedTable,$relationshipName);
+        $processedFKField = self::validateForeignKeyField($fkField, $modelName, $referencedModel, $referencedTable, $relationshipName);
 
         $htmlTypeInputs = explode(':', $htmlType);
         $htmlType = array_shift($htmlTypeInputs);
@@ -108,16 +110,16 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
             'relationshipTitle'     => Str::title(str_replace('_', ' ', $relatedModel)),
             'relationshipType'      => $relationshipType,
             'relationshipName'      => $relationshipName,
-            'relationshipInputs' => $relationshipInputs,
-            'htmlType'       => $htmlType,
-            'htmlTypeInputs' => $htmlTypeInputs,
-            'validations'    => $validations,
-            'searchable'     => isset($relationshipSettings['searchable']) ? $relationshipSettings['searchable'] : false,
-            'fillable'       => isset($relationshipSettings['fillable']) ? $relationshipSettings['fillable'] : true,
-            'primary'        => isset($relationshipSettings['primary']) ? $relationshipSettings['primary'] : false,
-            'inForm'         => isset($relationshipSettings['inForm']) ? $relationshipSettings['inForm'] : true,
-            'inIndex'        => isset($relationshipSettings['inIndex']) ? $relationshipSettings['inIndex'] : true,
-            'fkFields'  => [$processedFKField],
+            'relationshipInputs'    => $relationshipInputs,
+            'htmlType'              => $htmlType,
+            'htmlTypeInputs'        => $htmlTypeInputs,
+            'validations'           => $validations,
+            'searchable'            => isset($relationshipSettings['searchable']) ? $relationshipSettings['searchable'] : false,
+            'fillable'              => isset($relationshipSettings['fillable']) ? $relationshipSettings['fillable'] : true,
+            'primary'               => isset($relationshipSettings['primary']) ? $relationshipSettings['primary'] : false,
+            'inForm'                => isset($relationshipSettings['inForm']) ? $relationshipSettings['inForm'] : true,
+            'inIndex'               => isset($relationshipSettings['inIndex']) ? $relationshipSettings['inIndex'] : true,
+            'fkFields'              => [$processedFKField],
         ];
     }
 }

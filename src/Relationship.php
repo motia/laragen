@@ -13,14 +13,15 @@ abstract class Relationship
         $this->relationshipInput = $relationshipField;
     }
 
-    public function getForeignKeys(){
-
+    public function getForeignKeys()
+    {
     }
 
-    public function process(){
+    public function process()
+    {
     }
 
-    protected function buildForeignKeys(){
-
+    protected function buildForeignKeys()
+    {
     }
 }

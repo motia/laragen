@@ -4,11 +4,10 @@ namespace Motia\Generator\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
-use Motia\Generator\Utils\GeneratorRelationshipInputUtil;
 use Illuminate\Support\Str;
-use Symfony\Component\Process\Process;
+use Motia\Generator\Utils\GeneratorRelationshipInputUtil;
 use Symfony\Component\Process\Exception\ProcessFailedException;
-
+use Symfony\Component\Process\Process;
 
 class GUIGenCommand extends Command
 {
@@ -30,12 +29,11 @@ class GUIGenCommand extends Command
 
     /**
      * Create a new command instance.
-     *
      */
     public function __construct()
     {
         parent::__construct();
-        $this->filesystem = new Filesystem;;
+        $this->filesystem = new Filesystem();
     }
 
     /**
@@ -58,12 +56,13 @@ class GUIGenCommand extends Command
         $generatorAddOns = ['swagger' => true, 'datatable' => true];
 
         $schemaFilesDirectory = 'resources/model_schemas/';
-        $schemaFiles = $this->filesystem->glob($schemaFilesDirectory . '*.json');
+        $schemaFiles = $this->filesystem->glob($schemaFilesDirectory.'*.json');
 
         $schemas = array_map(
-            function($file){
+            function ($file) {
                 $modelName = studly_case(str_singular($this->filesystem->name($file)));
                 $tableName = Str::snake(Str::plural($modelName));
+
                 return compact('file', 'modelName', 'tableName');
             },
             $schemaFiles
@@ -82,23 +81,23 @@ class GUIGenCommand extends Command
 
         //die(json_encode($compiledModelSchemas));
 
-        foreach ($compiledModelSchemas as $compiledModelSchema){
+        foreach ($compiledModelSchemas as $compiledModelSchema) {
             $modelName = $compiledModelSchema['modelName'];
             $tableName = $compiledModelSchema['tableName'];
             $fields = &$compiledModelSchema['fields'];
             $relationships = $compiledModelSchema['relationships'];
 
             $jsonData = [
-                'migrate' => true,
-                'fields' => $fields,
+                'migrate'       => true,
+                'fields'        => $fields,
                 'relationships' => $relationships,
-                'tableName' => $tableName,
-                'options' => $generatorOptions,
-                'addOns' => $generatorAddOns,
+                'tableName'     => $tableName,
+                'options'       => $generatorOptions,
+                'addOns'        => $generatorAddOns,
             ];
 
             $options = [
-                'model' => $modelName,
+                'model'         => $modelName,
                 '--jsonFromGUI' => json_encode($jsonData),
             ];
 
@@ -107,27 +106,29 @@ class GUIGenCommand extends Command
 
         // project specific
         // copies some migrations files
-        $filesToCopy = $this->filesystem->glob($postMigrationsDirectory . '*.php');
+        $filesToCopy = $this->filesystem->glob($postMigrationsDirectory.'*.php');
 
         foreach ($filesToCopy as $file) {
-            $this->filesystem->copy($file, 'database/migrations/' . date('Y_m_d_His') . '_' . basename($file));
+            $this->filesystem->copy($file, 'database/migrations/'.date('Y_m_d_His').'_'.basename($file));
         }
     }
 
-    public function deleteObsoleteMigrationFiles(){
+    public function deleteObsoleteMigrationFiles()
+    {
         $migrationFiles = glob('database/migrations/*.php');
 
         // delete all generated migration files
         foreach ($migrationFiles as $migrationFile) {
-            if (!str_contains($migrationFile, 'create_users_table') && !str_contains($migrationFile, 'create_password_resets_table'))
+            if (!str_contains($migrationFile, 'create_users_table') && !str_contains($migrationFile, 'create_password_resets_table')) {
                 $this->filesystem->delete($migrationFile);
+            }
         }
     }
 
     //  mutates modelSchemas, add
     //  NOTE: fields defined in the schemaFile properties override those of the deduced foreign keys
-    public function compileModelSchemas($schemas){
-
+    public function compileModelSchemas($schemas)
+    {
         foreach ($schemas as $modelName => &$schema) {
             $file = $schema['file'];
 
@@ -142,8 +143,8 @@ class GUIGenCommand extends Command
             $indexedSchemaFields = [];
 
             // indexing fields
-            foreach ($schemaFields as &$schemaField){
-                if(isset($schemaField['fieldInput'])) {
+            foreach ($schemaFields as &$schemaField) {
+                if (isset($schemaField['fieldInput'])) {
                     $fieldName = strtok($schemaField['fieldInput'], ':');
                     $indexedSchemaFields[$fieldName] = $schemaField;
                 }
@@ -160,7 +161,7 @@ class GUIGenCommand extends Command
                 $fkModel = $foreignKey['fkOptions']['model'];
 
                 $referencedSchema = &$schemas[$fkModel];
-                if(!isset($referencedSchema['fields'][$fkName])){
+                if (!isset($referencedSchema['fields'][$fkName])) {
                     $referencedSchema['fields'][$fkName] = [];
                 }
 
@@ -175,20 +176,23 @@ class GUIGenCommand extends Command
             foreach ($schema['fields'] as $field) {
                 $fieldName = strtok($field['fieldInput'], ':');
 
-                if(isset($schema['fields'][$fieldName]))
+                if (isset($schema['fields'][$fieldName])) {
                     // override fk fieldInput properties from schema file
                     $schema['fields'][$fieldName] =
                         array_merge($schema['fields'][$fieldName], $field);
-                else
+                } else {
                     // create new fieldInput from schema file
                     $schema['fields'][$fieldName] = $field;
+                }
             }
         }
+
         return $schemas;
         //$this->json_die($schemas);
     }
 
-    public function json_die($var){
+    public function json_die($var)
+    {
         die(json_encode($var));
     }
 }
