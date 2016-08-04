@@ -8,7 +8,7 @@ class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilIn
 {
     use GeneratorRelationshipInputUtilTrait;
 
-    public static $AVAILABLE_RELATIONSHIPS = ['belongsTo', 'HasOne', 'belongsToMany', 'hasMany'];
+    public static $AVAILABLE_RELATIONSHIPS = ['belongsTo', 'hasOne', 'belongsToMany', 'hasMany'];
 
     /**
      * @param $relationship
@@ -24,13 +24,14 @@ class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilIn
         switch ($relationType) {
             case 'belongsTo':
                 return GeneratorBelongsToRelationshipUtil::validateRelationship($relationship);
-            case 'HasOne':
+            case 'hasOne':
                 return GeneratorHasOneRelationshipUtil::validateRelationship($relationship);
             case 'belongsToMany':
                 return GeneratorBelongsToManyRelationshipUtil::validateRelationship($relationship);
             case 'hasMany':
                 return GeneratorHasManyRelationshipUtil::validateRelationship($relationship);
         }
+        return null;
     }
 
     public static function processRelationshipInput($relationshipInput,

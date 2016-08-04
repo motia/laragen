@@ -62,7 +62,7 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
     {
         $fieldInputs = explode(':', $relationInput);
 
-        if (count($fieldInputs) < 2 || $fieldInputs[0] == 'belongsTo') {
+        if (count($fieldInputs) < 2 || $fieldInputs[0] != 'belongsTo') {
             return false;
         }
 

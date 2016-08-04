@@ -71,6 +71,7 @@ trait GeneratorRelationshipInputUtilTrait
         $fkOptions['relationshipName'] = $relationshipName;
 
         $defaultFKOptions = [
+            'type'       => 'integer,false,true',
             'references' => 'id',
             'on'         => $referencedTable,
             'onUpdate'   => 'RESTRICT',
@@ -86,15 +87,20 @@ trait GeneratorRelationshipInputUtilTrait
         $otherDatabaseInputs = '';
 
         foreach ($fieldInputs as $index => $fieldInput) {
+            if ($index == 1) {
+                $fkOptionsFromFieldInput['type'] = $fieldInput;
+                continue;
+            }
+
             $tokens = explode(',', $fieldInput);
+
             if (count($tokens) == 1) {
                 if ($index == 0) {
                     $fkOptionsFromFieldInput['field'] = $tokens[0];
                 } else {
                     $otherDatabaseInputs .= $tokens[0];
                 }
-            }
-            if (count($tokens) > 1) {
+            } else {
                 $token = array_shift($tokens);
                 $fkOptionsFromFieldInput[$token] = implode(',', $tokens);
             }
@@ -108,9 +114,10 @@ trait GeneratorRelationshipInputUtilTrait
                 $fkOptions['references'] = $defaultFKOptions['references'];
             }
         }
+
         $defaultFKOptions['field'] = Str::snake($referencedModel).'_'.$fkOptions['references'];
 
-        foreach (['field', 'on', 'onUpdate', 'onDelete'] as $option) {
+        foreach (['field', 'on', 'onUpdate', 'onDelete', 'type'] as $option) {
             if (!isset($foreignKeyField[$option])) {
                 if (isset($fkOptionsFromFieldInput[$option])) {
                     $fkOptions[$option] = $fkOptionsFromFieldInput[$option];
@@ -121,8 +128,9 @@ trait GeneratorRelationshipInputUtilTrait
             }
         }
 
-        $fieldInput = $fkOptions['field'].':foreign'
-            .':references,'."'".$fkOptions['references']."'"
+        $fieldInput = $fkOptions['field']
+            .':'.$fkOptions['type']
+            .':foreign:references,'."'".$fkOptions['references']."'"
             .':on,'."'".$fkOptions['on']."'"
             .':onUpdate,'."'".$fkOptions['onUpdate']."'"
             .':onDelete,'."'".$fkOptions['onDelete']."'"
