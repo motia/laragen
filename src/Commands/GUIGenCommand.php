@@ -5,8 +5,10 @@ namespace Motia\Generator\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Motia\Generator\Utils\GeneratorRelationshipInputUtil;
-use RuntimeException;
-use Exception;
+use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+
 
 class GUIGenCommand extends Command
 {
@@ -24,14 +26,16 @@ class GUIGenCommand extends Command
      */
     protected $description = 'generates models and migration from json files';
 
+    protected $filesystem;
+
     /**
      * Create a new command instance.
      *
-     * @return void
      */
     public function __construct()
     {
         parent::__construct();
+        $this->filesystem = new Filesystem;;
     }
 
     /**
@@ -41,91 +45,150 @@ class GUIGenCommand extends Command
      */
     public function handle()
     {
+        $process = new Process('.\resetdb.bat');
+        $process->run();
+        if (!$process->isSuccessful()) {
+            throw new ProcessFailedException($process);
+        }
+        //echo $process->getOutput() . "\n";
 
+        // generation configuration for all models
         $command = 'infyom:api_scaffold';
         $generatorOptions = ['paginate' => '15', 'skip' => 'dump-autoload'];
         $generatorAddOns = ['swagger' => true, 'datatable' => true];
 
-        $filesystem = new Filesystem;
-        $migrationFiles = glob('database/migrations/*.php');
-        $primaryKeys = [];
-
-        // delete all generated migration files
-        foreach ($migrationFiles as $migrationFile) {
-            if (!str_contains($migrationFile, 'create_users_table') && !str_contains($migrationFile, 'create_password_resets_table'))
-                $filesystem->delete($migrationFile);
-        }
-
         $schemaFilesDirectory = 'resources/model_schemas/';
-        $schemaFiles = $filesystem->glob($schemaFilesDirectory . '*.json');
+        $schemaFiles = $this->filesystem->glob($schemaFilesDirectory . '*.json');
 
-        $fieldInputsArray = [];
-        $relationships = [];
+        $schemas = array_map(
+            function($file){
+                $modelName = studly_case(str_singular($this->filesystem->name($file)));
+                $tableName = Str::snake(Str::plural($modelName));
+                return compact('file', 'modelName', 'tableName');
+            },
+            $schemaFiles
+        );
 
-        // prepare each model from its schemaFile
-        foreach ($schemaFiles as $file) {
-            var_dump('Log(file) = '. $file);
+        $schemas = array_combine(array_column($schemas, 'modelName'), $schemas);
 
-            $schemaModel = studly_case(str_singular($filesystem->name($file)));
+        $postMigrationsDirectory = 'storage/myschema/post_migrations/';
 
-            $fileContents = file_get_contents($file);
+        $this->deleteObsoleteMigrationFiles();
 
-            $jsonData = json_decode($fileContents, true);
+        // compiles schemas
+        $compiledModelSchemas = $this->compileModelSchemas($schemas);
+        //dd($compiledModelSchemas);
+        //dd(json_encode($modelSchemas));
 
-            // returns $model => [$relationship1, $relationship2...]
-            $pulledRelationships = GeneratorRelationshipInputUtil::pullRelationships($jsonData);
-            $foreignKeyInputFields = GeneratorRelationshipInputUtil::pullForeignKeysColumn($pulledRelationships) ;
-            $relationships += $pulledRelationships;
+        //die(json_encode($compiledModelSchemas));
 
-            foreach ($foreignKeyInputFields as $foreignKey) {
-                $fkName = $foreignKey['fieldName'];
-                $modelName = array_pull($foreignKey, 'modelName');
-                // adds field options to the deduced foreign keys
-                // options have less priority than the inputFields options
-                $fieldInputsArray[$modelName][$fkName] += $foreignKey;
-            }
-
-            foreach ($jsonData as $fieldInput) {
-                $fieldInputName = strtok($fieldInput['fieldInput'], ':');
-
-                if(isset($fieldInputsArray[$schemaModel][$fieldInputName]))
-                    $oldInputField = $fieldInputsArray[$schemaModel][$fieldInputName];
-                else $oldInputField = [];
-
-                $fieldInputsArray[$schemaModel][$fieldInputName] = $fieldInput + $oldInputField;
-            }
-        }
-
-        // remove keys for input fields
-        $fieldInputsArray = array_map('array_values', $fieldInputsArray);
-        //dd($fieldInputsArray);
-        foreach ($fieldInputsArray as $model => $fieldInputs){
-            var_dump("Log(model=$model)");
+        foreach ($compiledModelSchemas as $compiledModelSchema){
+            $modelName = $compiledModelSchema['modelName'];
+            $tableName = $compiledModelSchema['tableName'];
+            $fields = &$compiledModelSchema['fields'];
+            $relationships = $compiledModelSchema['relationships'];
 
             $jsonData = [
                 'migrate' => true,
-                'fields' => $fieldInputs,
+                'fields' => $fields,
+                'relationships' => $relationships,
+                'tableName' => $tableName,
                 'options' => $generatorOptions,
                 'addOns' => $generatorAddOns,
             ];
 
             $options = [
-                'model' => $model,
+                'model' => $modelName,
                 '--jsonFromGUI' => json_encode($jsonData),
             ];
-            
+
             $this->call($command, $options);
         }
 
         // project specific
         // copies some migrations files
-
-        $postMigrationsDirectory = 'storage/myschema/post_migrations/';
-        $filesToCopy = $filesystem->glob($postMigrationsDirectory . '*.php');
+        $filesToCopy = $this->filesystem->glob($postMigrationsDirectory . '*.php');
 
         foreach ($filesToCopy as $file) {
-            $filesystem->copy($file, 'database/migrations/' . date('Y_m_d_His') . '_' . basename($file));
+            $this->filesystem->copy($file, 'database/migrations/' . date('Y_m_d_His') . '_' . basename($file));
         }
     }
 
+    public function deleteObsoleteMigrationFiles(){
+        $migrationFiles = glob('database/migrations/*.php');
+
+        // delete all generated migration files
+        foreach ($migrationFiles as $migrationFile) {
+            if (!str_contains($migrationFile, 'create_users_table') && !str_contains($migrationFile, 'create_password_resets_table'))
+                $this->filesystem->delete($migrationFile);
+        }
+    }
+
+    //  mutates modelSchemas, add
+    //  NOTE: fields defined in the schemaFile properties override those of the deduced foreign keys
+    public function compileModelSchemas($schemas){
+
+        foreach ($schemas as $modelName => &$schema) {
+            $file = $schema['file'];
+
+            $fileContents = file_get_contents($file);
+            $schemaFields = json_decode($fileContents, true);
+
+            // returns $model => [$relationship1, $relationship2...]
+            $pulledRelationships = GeneratorRelationshipInputUtil::pullRelationships($schemaFields, $modelName);
+            // echo json_encode($pulledRelationships);
+            $foreignKeyFields = GeneratorRelationshipInputUtil::getForeignKeysColumn($pulledRelationships);
+
+            $indexedSchemaFields = [];
+
+            // indexing fields
+            foreach ($schemaFields as &$schemaField){
+                if(isset($schemaField['fieldInput'])) {
+                    $fieldName = strtok($schemaField['fieldInput'], ':');
+                    $indexedSchemaFields[$fieldName] = $schemaField;
+                }
+            }
+
+            //dd($pulledRelationships);
+            //dd($foreignKeyfields);
+            $schema['fields'] = $indexedSchemaFields;
+            $schema['relationships'] = $pulledRelationships;
+
+            // populate relevant models deduced foreign
+            foreach ($foreignKeyFields as $foreignKey) {
+                $fkName = $foreignKey['fkOptions']['field'];
+                $fkModel = $foreignKey['fkOptions']['model'];
+
+                $referencedSchema = &$schemas[$fkModel];
+                if(!isset($referencedSchema['fields'][$fkName])){
+                    $referencedSchema['fields'][$fkName] = [];
+                }
+
+                // adds the old field properties(higher priority) to the deduced foreign keys
+                $referencedSchema['fields'][$fkName] =
+                    array_merge($foreignKey, $referencedSchema['fields'][$fkName]);
+                //dd($referencedSchema);
+            }
+
+            //$this->json_die($schema);
+
+            foreach ($schema['fields'] as $field) {
+                $fieldName = strtok($field['fieldInput'], ':');
+
+                if(isset($schema['fields'][$fieldName]))
+                    // override fk fieldInput properties from schema file
+                    $schema['fields'][$fieldName] =
+                        array_merge($schema['fields'][$fieldName], $field);
+                else
+                    // create new fieldInput from schema file
+                    $schema['fields'][$fieldName] = $field;
+            }
+        }
+        return $schemas;
+        //$this->json_die($schemas);
+    }
+
+    public function json_die($var){
+        die(json_encode($var));
+    }
 }

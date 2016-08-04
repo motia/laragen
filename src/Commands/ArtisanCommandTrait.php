@@ -2,8 +2,8 @@
 
 namespace Motia\Generator\Commands;
 
-use Symfony\Component\Process\Process;
 use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Process;
 
 trait ArtisanCommandTrait{
     public function executeArtisanCommand($command, $options){

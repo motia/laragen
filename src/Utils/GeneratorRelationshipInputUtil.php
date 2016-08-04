@@ -18,7 +18,7 @@ class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilIn
     public static function validateRelationship($relationship){
         $relationType = self::validateRelationshipInput($relationship['relationshipInput']);
         if (!$relationType) {
-            throw new RuntimeException('Invalid Input '.$relationship['relationship']);
+            throw new RuntimeException('Invalid Input '.$relationship['relationshipInput']);
         }
         switch ($relationType){
             case 'belongsTo':
@@ -57,15 +57,17 @@ class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilIn
         return null;
     }
 
-    public static function validateRelationshipInput($relation)
+    public static function validateRelationshipInput($relationshipInput)
     {
-        $fieldInputs = explode(':', $relation);
+        $relationshipInputs = explode(':', $relationshipInput);
 
-        if (count($fieldInputs) < 2 || !in_array($fieldInputs[0], self::$AVAILABLE_RELATIONSHIPS)) {
+        if (count($relationshipInputs) < 2) {
             return false;
         }
-        return $fieldInputs[0];
+
+        $requiredRelationshipInputs = explode(',', $relationshipInputs[1]);
+        $relationshipType = $requiredRelationshipInputs[0];
+
+        return (in_array($relationshipType, self::$AVAILABLE_RELATIONSHIPS)) ? $relationshipType : false;
     }
-
-
 }

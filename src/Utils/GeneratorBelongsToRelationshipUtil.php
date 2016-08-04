@@ -3,10 +3,6 @@
 namespace Motia\Generator\Utils;
 
 use Illuminate\Support\Str;
-use InfyOm\Generator\Utils\GeneratorFieldsInputUtil;
-use Motia\Generator\Utils\GeneratorRelationshipInputUtilInterface;
-
-use RuntimeException;
 
 class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUtilInterface
 {
@@ -56,25 +52,20 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
             'fillable'   => $fillable,
             'inForm'     => $inForm,
             'inIndex'    => $inIndex,
-            'fkFieldInputs' => [],
         ];
-
-        foreach ($relationship['foreignKeys'] as $foreignKeyFieldInput) {
-            $relationshipSettings['fkFieldInputs'] = GeneratorFieldsInputUtil::processFieldInput(
-                self::replaceByEmptyIfNull($foreignKeyFieldInput['fieldInput']),
-                self::replaceByEmptyIfNull($foreignKeyFieldInput['htmlType']),
-                self::replaceByEmptyIfNull($foreignKeyFieldInput['validations']),
-                [
-                    'searchable' => self::replaceByEmptyIfNull($foreignKeyFieldInput['searchable']),
-                    'fillable'   => self::replaceByEmptyIfNull($foreignKeyFieldInput['fillable']),
-                    'inForm'     => self::replaceByEmptyIfNull($foreignKeyFieldInput['inForm']),
-                    'inIndex'    => self::replaceByEmptyIfNull($foreignKeyFieldInput['inIndex']),
-                ]
-            );
-        }
-
+        
         return
-            self::processRelationshipInput($relationship['fieldInput'], $htmlType, $validations, $relationshipSettings);
+            self::processRelationshipInput($relationship['relationshipInput'], $htmlType, $validations, $relationshipSettings);
+    }
+
+    public static function validateRelationshipInput($relationInput)
+    {
+        $fieldInputs = explode(':', $relationInput);
+
+        if (count($fieldInputs) < 2 || $fieldInputs[0] == 'belongsTo') {
+            return false;
+        }
+        return true;
     }
 
     public static function processRelationshipInput($relationshipInput,
@@ -83,9 +74,27 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
                                                     $relationshipSettings = []){
         $relationshipInputs = explode(':', $relationshipInput);
 
-        $relationshipName = array_shift($relationshipInputs);
-        $eloquentInputs = implode(':', $relationshipInputs);
-        $relationshipType = explode(',', $relationshipInputs[0])[0];
+        // modelname ; relationtype,relatedModel,fk1,fk2; eloquentinput1 ; eloquentinput2 ...
+        $modelName = array_shift($relationshipInputs);
+
+        // relationtype,relatedModel,fk1,fk2 , eloquentinput1 , eloquentinput2 ...
+        $requiredRelationshipInput = $relationshipInputs[0];
+        $requiredRelationshipInputs = explode(',', $requiredRelationshipInput);
+
+        $relationshipType = array_shift($requiredRelationshipInputs);
+        $relatedModel = array_shift($requiredRelationshipInputs);
+        $relationshipName = $relatedModel;
+        // TODO change it for hasOneOrMany used in other classes
+        $referencedModel = Str::ucfirst($relatedModel);
+
+        // TODO must support differnent table names
+        $referencedTable = Str::snake(Str::plural($relatedModel));
+
+        $fkField = isset($relationshipSettings['fkFields'][0]) ?
+            $relationshipSettings['fkFields'][0] : [];
+
+        // TODO
+        $processedFKField = self::validateForeignKeyField($fkField, $modelName, $referencedModel, $referencedTable,$relationshipName);
 
         $htmlTypeInputs = explode(':', $htmlType);
         $htmlType = array_shift($htmlTypeInputs);
@@ -96,10 +105,10 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
 
         return [
             'relationshipInput'     => $relationshipInput,
-            'relationshipTitle'     => Str::title(str_replace('_', ' ', $relationshipName)),
+            'relationshipTitle'     => Str::title(str_replace('_', ' ', $relatedModel)),
             'relationshipType'      => $relationshipType,
             'relationshipName'      => $relationshipName,
-            'eloquentInputs' => $eloquentInputs,
+            'relationshipInputs' => $relationshipInputs,
             'htmlType'       => $htmlType,
             'htmlTypeInputs' => $htmlTypeInputs,
             'validations'    => $validations,
@@ -108,12 +117,7 @@ class GeneratorBelongsToRelationshipUtil implements GeneratorRelationshipInputUt
             'primary'        => isset($relationshipSettings['primary']) ? $relationshipSettings['primary'] : false,
             'inForm'         => isset($relationshipSettings['inForm']) ? $relationshipSettings['inForm'] : true,
             'inIndex'        => isset($relationshipSettings['inIndex']) ? $relationshipSettings['inIndex'] : true,
-            'fkFieldInputs'  => $relationshipSettings['$fkFieldInputs'],
+            'fkFields'  => [$processedFKField],
         ];
-    }
-
-    public static function validateRelationshipInput($relationInput)
-    {
-        // TODO: Implement validateRelationshipInput() method.
     }
 }
