@@ -2,7 +2,6 @@
 
 namespace Motia\Generator\Utils;
 
-
 class GeneratorHasOneRelationshipUtil implements GeneratorRelationshipInputUtilInterface
 {
     use GeneratorRelationshipInputUtilTrait;

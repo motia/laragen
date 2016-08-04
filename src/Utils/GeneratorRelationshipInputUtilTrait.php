@@ -3,7 +3,6 @@
 namespace Motia\Generator\Utils;
 
 use Illuminate\Support\Str;
-use InfyOm\Generator\Utils\GeneratorFieldsInputUtil;
 
 trait GeneratorRelationshipInputUtilTrait
 {
@@ -41,7 +40,7 @@ trait GeneratorRelationshipInputUtilTrait
         $pulledRelationships = [];
         foreach ($jsonData as $index => $field) {
             if (isset($field['relationshipInput'])) {
-                $field['relationshipInput'] = $modelName . $field['relationshipInput'];
+                $field['relationshipInput'] = $modelName.$field['relationshipInput'];
 
                 $pulledRelationship = self::validateRelationship($field);
                 $relationshipName = $pulledRelationship['relationshipName'];
@@ -50,19 +49,22 @@ trait GeneratorRelationshipInputUtilTrait
                 unset($jsonData[$index]);
             }
         }
+
         return $pulledRelationships;
     }
 
-    public static function getForeignKeysColumn($pulledRelationships){
+    public static function getForeignKeysColumn($pulledRelationships)
+    {
         $result = [];
-        foreach ($pulledRelationships as $relationship){
+        foreach ($pulledRelationships as $relationship) {
             $result += $relationship['fkFields'];
         }
+
         return $result;
     }
 
-
-    public static function validateForeignKeyField($foreignKeyField, $model, $referencedModel, $referencedTable, $relationshipName){
+    public static function validateForeignKeyField($foreignKeyField, $model, $referencedModel, $referencedTable, $relationshipName)
+    {
         $fkOptions = isset($foreignKeyField['fkOptions']) ? $foreignKeyField['fkOptions'] : null;
         $fkOptions['model'] = $model;
         $fkOptions['referencedModel'] = $referencedModel;
@@ -70,57 +72,61 @@ trait GeneratorRelationshipInputUtilTrait
 
         $defaultFKOptions = [
             'references' => 'id',
-            'on' => $referencedTable,
-            'onUpdate' => 'RESTRICT',
-            'onDelete' => 'RESTRICT'
+            'on'         => $referencedTable,
+            'onUpdate'   => 'RESTRICT',
+            'onDelete'   => 'RESTRICT',
         ];
 
         $fieldInputs = [];
-        if(isset($foreignKeyField['fieldInput']))
+        if (isset($foreignKeyField['fieldInput'])) {
             $fieldInputs = explode(':', $foreignKeyField['fieldInput']);
+        }
 
         $fkOptionsFromFieldInput = [];
         $otherDatabaseInputs = '';
 
         foreach ($fieldInputs as $index => $fieldInput) {
             $tokens = explode(',', $fieldInput);
-            if(count($tokens) == 1){
-                if($index == 0)
+            if (count($tokens) == 1) {
+                if ($index == 0) {
                     $fkOptionsFromFieldInput['field'] = $tokens[0];
-                else
+                } else {
                     $otherDatabaseInputs .= $tokens[0];
+                }
             }
-            if(count($tokens) > 1){
+            if (count($tokens) > 1) {
                 $token = array_shift($tokens);
                 $fkOptionsFromFieldInput[$token] = implode(',', $tokens);
             }
         }
 
-        if(!isset($fkOptions['references'])){
-            if(isset($fkOptionsFromFieldInput['references']))
+        if (!isset($fkOptions['references'])) {
+            if (isset($fkOptionsFromFieldInput['references'])) {
                 $fkOptions['references'] = $fkOptionsFromFieldInput['references'];
-            if(!isset($fkOptions['references']) || $fkOptions['references'] == '$'){
+            }
+            if (!isset($fkOptions['references']) || $fkOptions['references'] == '$') {
                 $fkOptions['references'] = $defaultFKOptions['references'];
             }
         }
-        $defaultFKOptions['field'] = Str::snake($referencedModel) . '_' . $fkOptions['references'];
+        $defaultFKOptions['field'] = Str::snake($referencedModel).'_'.$fkOptions['references'];
 
-        foreach(['field', 'on', 'onUpdate', 'onDelete'] as $option){
-            if(!isset($foreignKeyField[$option])){
-                if(isset($fkOptionsFromFieldInput[$option]))
+        foreach (['field', 'on', 'onUpdate', 'onDelete'] as $option) {
+            if (!isset($foreignKeyField[$option])) {
+                if (isset($fkOptionsFromFieldInput[$option])) {
                     $fkOptions[$option] = $fkOptionsFromFieldInput[$option];
-                if(!isset($foreignKeyField[$option]) || $foreignKeyField[$option] == '$'){
+                }
+                if (!isset($foreignKeyField[$option]) || $foreignKeyField[$option] == '$') {
                     $fkOptions[$option] = $defaultFKOptions[$option];
                 }
             }
         }
 
-        $fieldInput = $fkOptions['field'] . ':foreign'
-            . ':references,' . "'" . $fkOptions['references'] . "'"
-            . ':on,' . "'" .$fkOptions['on'] . "'"
-            . ':onUpdate,' . "'"  . $fkOptions['onUpdate'] . "'"
-            . ':onDelete,' . "'" . $fkOptions['onDelete'] . "'"
-            . $otherDatabaseInputs;
+        $fieldInput = $fkOptions['field'].':foreign'
+            .':references,'."'".$fkOptions['references']."'"
+            .':on,'."'".$fkOptions['on']."'"
+            .':onUpdate,'."'".$fkOptions['onUpdate']."'"
+            .':onDelete,'."'".$fkOptions['onDelete']."'"
+            .$otherDatabaseInputs;
 
 
 

@@ -39,47 +39,44 @@ class GenerateAllCommand extends Command
      */
     public function handle()
     {
-        
-        $filesystem = new Filesystem;
+        $filesystem = new Filesystem();
         $migrationFiles = glob('database/migrations/*.php');
         foreach ($migrationFiles as $migFile) {
-            if( !str_contains($migFile, 'create_users_table') && !str_contains($migFile, 'create_password_resets_table') )
+            if (!str_contains($migFile, 'create_users_table') && !str_contains($migFile, 'create_password_resets_table')) {
                 $filesystem->delete($migFile);
+            }
         }
 
         $directory = 'storage/myschema/table_descrp/';
 
         $jsonFiles = $filesystem->glob($directory.'*.json');
-        
 
-        foreach($jsonFiles as $file){
+
+        foreach ($jsonFiles as $file) {
             $fileName = $filesystem->name($file);
 
             $model = studly_case(str_singular($fileName));
             $tableName = $fileName;
-            
+
             $options = [
-                    'model' => $model,
+                    'model'        => $model,
                     '--fieldsFile' => $file,
-                    '--tableName' => $tableName,
-                    '--skip' => 'dump-autoload',
-                    '--paginate' => 15,
-                    '-n' => null
+                    '--tableName'  => $tableName,
+                    '--skip'       => 'dump-autoload',
+                    '--paginate'   => 15,
+                    '-n'           => null,
                 ];
 
             $command = 'infyom:api_scaffold';
-            $output = $this->executeArtisanCommand($command, $options);        
+            $output = $this->executeArtisanCommand($command, $options);
             echo $output;
         }
 
         $directory = 'storage/myschema/post_migrations/';
         $filesToCopy = $filesystem->glob($directory.'*.php');
 
-        foreach($filesToCopy as $file){
-            $filesystem->copy($file, 'database/migrations/' . date('Y_m_d_His')  . '_' . basename($file));
-        }        
+        foreach ($filesToCopy as $file) {
+            $filesystem->copy($file, 'database/migrations/'.date('Y_m_d_His').'_'.basename($file));
+        }
     }
-
-
-
 }

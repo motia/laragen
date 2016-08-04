@@ -3,7 +3,6 @@
 namespace Motia\Generator\Utils;
 
 use RuntimeException;
-use Motia\Generator\Utils\GeneratorRelationshipInputUtilInterface;
 
 class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilInterface
 {
@@ -13,14 +12,16 @@ class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilIn
 
     /**
      * @param $relationship
+     *
      * @return array|null|string
      */
-    public static function validateRelationship($relationship){
+    public static function validateRelationship($relationship)
+    {
         $relationType = self::validateRelationshipInput($relationship['relationshipInput']);
         if (!$relationType) {
             throw new RuntimeException('Invalid Input '.$relationship['relationshipInput']);
         }
-        switch ($relationType){
+        switch ($relationType) {
             case 'belongsTo':
                 return GeneratorBelongsToRelationshipUtil::validateRelationship($relationship);
             case 'HasOne':
@@ -30,21 +31,20 @@ class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilIn
             case 'hasMany':
                 return GeneratorHasManyRelationshipUtil::validateRelationship($relationship);
         }
-        return null;
     }
 
     public static function processRelationshipInput($relationshipInput,
                                                          $htmlType,
                                                          $validations,
-                                                         $fieldSettings = []){
-
+                                                         $fieldSettings = [])
+    {
         $relationType = self::validateRelationshipInput($relationshipInput);
 
         if (!$relationType) {
             throw new RuntimeException('Invalid Input '.$relationshipInput);
         }
 
-        switch ($relationType){
+        switch ($relationType) {
             case 'belongsTo':
                 return GeneratorBelongsToRelationshipUtil::processRelationshipInput($relationshipInput);
             case 'HasOne':
@@ -54,7 +54,6 @@ class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilIn
             case 'hasMany':
                 return GeneratorHasManyRelationshipUtil::processRelationshipInput($relationshipInput);
         }
-        return null;
     }
 
     public static function validateRelationshipInput($relationshipInput)

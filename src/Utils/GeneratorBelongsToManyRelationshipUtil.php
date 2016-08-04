@@ -5,7 +5,7 @@ namespace Motia\Generator\Utils;
 class GeneratorBelongsToManyRelationshipUtil implements GeneratorRelationshipInputUtilInterface
 {
     use GeneratorRelationshipInputUtilTrait;
-    
+
     public static function validateRelationship($relationshipInput)
     {
         // TODO: Implement validateRelationship() method.
