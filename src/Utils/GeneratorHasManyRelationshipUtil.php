@@ -78,6 +78,7 @@ class GeneratorHasManyRelationshipUtil implements GeneratorRelationshipInputUtil
 
         // modelname ; relationtype,relatedModel,fk1,fk2; eloquentinput1 ; eloquentinput2 ...
         $modelName = array_shift($relationshipInputs);
+        $tableName = Str::snake(Str::plural($modelName));
 
         // relationtype,relatedModel,fk1,fk2 , eloquentinput1 , eloquentinput2 ...
         $requiredRelationshipInput = $relationshipInputs[0];
@@ -85,19 +86,15 @@ class GeneratorHasManyRelationshipUtil implements GeneratorRelationshipInputUtil
 
         $relationshipType = array_shift($requiredRelationshipInputs);
         $relatedModel = array_shift($requiredRelationshipInputs);
-        $relationshipName = $relatedModel;
-
-        // TODO must support differnent table names
-        $referencedTable = Str::snake(Str::plural($relatedModel));
+        $relatedTable = Str::snake(Str::plural($relatedModel));
+        $relationshipName = Str::plural($relatedModel);
+        //
 
         $fkField = isset($relationshipSettings['fkFields'][0]) ?
             $relationshipSettings['fkFields'][0] : [];
 
         // TODO
-        // referencedModel must be carefully chosen
-        $referencedModel = Str::ucfirst($modelName);
-
-        $processedFKField = self::validateForeignKeyField($fkField, $modelName, $referencedModel, $referencedTable, $relationshipName);
+        $processedFKField = self::validateForeignKeyField($fkField, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName);
 
         $htmlTypeInputs = explode(':', $htmlType);
         $htmlType = array_shift($htmlTypeInputs);

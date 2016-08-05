@@ -63,11 +63,13 @@ trait GeneratorRelationshipInputUtilTrait
         return $result;
     }
 
-    public static function validateForeignKeyField($foreignKeyField, $model, $referencedModel, $referencedTable, $relationshipName)
+    public static function validateForeignKeyField($foreignKeyField, $model, $table, $referencedModel, $referencedTable, $relationshipName)
     {
         $fkOptions = isset($foreignKeyField['fkOptions']) ? $foreignKeyField['fkOptions'] : null;
         $fkOptions['model'] = $model;
+        $fkOptions['table'] = $table;
         $fkOptions['referencedModel'] = $referencedModel;
+        $fkOptions['referencedTable'] = $referencedTable;
         $fkOptions['relationshipName'] = $relationshipName;
 
         $defaultFKOptions = [
