@@ -65,11 +65,11 @@ trait GeneratorRelationshipInputUtilTrait
 
     public static function validateForeignKeyField($foreignKeyField, $model, $table, $referencedModel, $referencedTable, $relationshipName)
     {
-        $fkOptions = isset($foreignKeyField['fkOptions']) ? $foreignKeyField['fkOptions'] : null;
+        $fkOptions = isset($foreignKeyField['fkOptions']) ? $foreignKeyField['fkOptions'] : [];
         $fkOptions['model'] = $model;
         $fkOptions['table'] = $table;
         $fkOptions['referencedModel'] = $referencedModel;
-        $fkOptions['referencedTable'] = $referencedTable;
+        $fkOptions['referencedTable'] = &$fkOptions['on']; // HACK
         $fkOptions['relationshipName'] = $relationshipName;
 
         $defaultFKOptions = [
@@ -86,22 +86,17 @@ trait GeneratorRelationshipInputUtilTrait
         }
 
         $fkOptionsFromFieldInput = [];
-        $otherDatabaseInputs = '';
+        $otherDatabaseInputs = [];
+
+        $fkOptionsFromFieldInput['type']  = array_shift($fieldInputs);
+        $fkOptionsFromFieldInput['field'] = array_shift($fieldInputs);
 
         foreach ($fieldInputs as $index => $fieldInput) {
-            if ($index == 1) {
-                $fkOptionsFromFieldInput['type'] = $fieldInput;
-                continue;
-            }
 
             $tokens = explode(',', $fieldInput);
 
             if (count($tokens) == 1) {
-                if ($index == 0) {
-                    $fkOptionsFromFieldInput['field'] = $tokens[0];
-                } else {
-                    $otherDatabaseInputs .= $tokens[0];
-                }
+                $otherDatabaseInputs[] = $tokens[0];
             } else {
                 $token = array_shift($tokens);
                 $fkOptionsFromFieldInput[$token] = implode(',', $tokens);
@@ -132,13 +127,7 @@ trait GeneratorRelationshipInputUtilTrait
 
         $fieldInput = $fkOptions['field']
             .':'.$fkOptions['type']
-            .':foreign:references,'."'".$fkOptions['references']."'"
-            .':on,'."'".$fkOptions['on']."'"
-            .':onUpdate,'."'".$fkOptions['onUpdate']."'"
-            .':onDelete,'."'".$fkOptions['onDelete']."'"
-            .$otherDatabaseInputs;
-
-
+            .implode(',', $otherDatabaseInputs);
 
         $result = compact('fieldInput', 'fkOptions');
         /*
