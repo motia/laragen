@@ -31,7 +31,6 @@ class GeneratorRelationshipInputUtil implements GeneratorRelationshipInputUtilIn
             case 'hasMany':
                 return GeneratorHasManyRelationshipUtil::validateRelationship($relationship);
         }
-        return null;
     }
 
     public static function processRelationshipInput($relationshipInput,

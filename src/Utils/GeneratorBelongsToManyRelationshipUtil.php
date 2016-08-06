@@ -111,24 +111,25 @@ class GeneratorBelongsToManyRelationshipUtil implements GeneratorRelationshipInp
         }
 
         return [
-            'relationshipInput'     => $relationshipInput,
-            'relationshipTitle'     => Str::title(str_replace('_', ' ', $relatedModel)),
-            'relationshipType'      => $relationshipType,
-            'relationshipName'      => $relationshipName,
-            'relationshipInputs'    => $relationshipInputs,
-            'htmlType'              => $htmlType,
-            'htmlTypeInputs'        => $htmlTypeInputs,
-            'validations'           => $validations,
-            'searchable'            => isset($relationshipSettings['searchable']) ? $relationshipSettings['searchable'] : false,
-            'fillable'              => isset($relationshipSettings['fillable']) ? $relationshipSettings['fillable'] : true,
-            'primary'               => isset($relationshipSettings['primary']) ? $relationshipSettings['primary'] : false,
-            'inForm'                => isset($relationshipSettings['inForm']) ? $relationshipSettings['inForm'] : true,
-            'inIndex'               => isset($relationshipSettings['inIndex']) ? $relationshipSettings['inIndex'] : true,
-            'fkFields'              => [$processedFKField1, $processedFKField2],
+            'relationshipInput'  => $relationshipInput,
+            'relationshipTitle'  => Str::title(str_replace('_', ' ', $relatedModel)),
+            'relationshipType'   => $relationshipType,
+            'relationshipName'   => $relationshipName,
+            'relationshipInputs' => $relationshipInputs,
+            'htmlType'           => $htmlType,
+            'htmlTypeInputs'     => $htmlTypeInputs,
+            'validations'        => $validations,
+            'searchable'         => isset($relationshipSettings['searchable']) ? $relationshipSettings['searchable'] : false,
+            'fillable'           => isset($relationshipSettings['fillable']) ? $relationshipSettings['fillable'] : true,
+            'primary'            => isset($relationshipSettings['primary']) ? $relationshipSettings['primary'] : false,
+            'inForm'             => isset($relationshipSettings['inForm']) ? $relationshipSettings['inForm'] : true,
+            'inIndex'            => isset($relationshipSettings['inIndex']) ? $relationshipSettings['inIndex'] : true,
+            'fkFields'           => [$processedFKField1, $processedFKField2],
         ];
     }
 
-    private static function preparePivotTableName($table1, $table2){
+    private static function preparePivotTableName($table1, $table2)
+    {
         $first = Str::singular(min($table1, $table2));
         $second = Str::singular(max($table1, $table2));
         // fixme name is not on the laravel standard to match the laravel-generator package
@@ -144,5 +145,4 @@ class GeneratorBelongsToManyRelationshipUtil implements GeneratorRelationshipInp
     {
         return ucfirst(camel_case(str_singular($table)));
     }
-
 }

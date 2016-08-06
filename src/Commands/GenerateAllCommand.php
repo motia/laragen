@@ -8,7 +8,6 @@ use Illuminate\Support\Str;
 use Motia\Generator\Generators\ForeignKeysMigrationGenerator;
 use Motia\Generator\Utils\GeneratorRelationshipInputUtil;
 
-
 class GenerateAllCommand extends Command
 {
     /**
@@ -53,8 +52,9 @@ class GenerateAllCommand extends Command
         $schemaFilesDirectory = 'resources/model_schemas/';
         $schemaFiles = $this->filesystem->glob($schemaFilesDirectory.'*.json');
 
-        foreach ($schemaFiles as $file)
+        foreach ($schemaFiles as $file) {
             $this->schemas[] = $this->createSchema($file);
+        }
 
         $this->schemas = array_combine(array_column($this->schemas, 'modelName'), $this->schemas);
 
@@ -138,13 +138,13 @@ class GenerateAllCommand extends Command
 
                 $this->tableFkOptions[$fkTable][$fkName] = $fkOptions;
 
-                if(!key_exists($fkModel, $this->schemas)){ // creates schema of a pivot table
+                if (!array_key_exists($fkModel, $this->schemas)) { // creates schema of a pivot table
                     $this->schemas[$fkModel] = [
-                        'modelName' => $fkModel,
-                        'tableName' => $fkTable,
-                        'file'      => null,
+                        'modelName'     => $fkModel,
+                        'tableName'     => $fkTable,
+                        'file'          => null,
                         'relationships' => [],
-                        'fields' => [],
+                        'fields'        => [],
                     ];
                 }
                 unset($fkSchema);
@@ -164,8 +164,9 @@ class GenerateAllCommand extends Command
                 unset($referencedSchema);
                 $referencedSchema = &$this->schemas[$referencedModel];
 
-                if(!isset($referencedSchema['fields'][$referencedField]))
+                if (!isset($referencedSchema['fields'][$referencedField])) {
                     $referencedSchema['fields'][$referencedField] = [];
+                }
                 $referencedSchema['fields'][$referencedField] =
                     array_merge($this->createPrimaryKey($referencedField), $referencedSchema['fields'][$referencedField]);
             }
@@ -185,8 +186,8 @@ class GenerateAllCommand extends Command
         }
     }
 
-
-    public function generateForeignKeyMigration(){
+    public function generateForeignKeyMigration()
+    {
         $fkMigrationGenerator = new ForeignKeysMigrationGenerator($this->tableFkOptions);
         $file = $fkMigrationGenerator->generate();
 
@@ -194,26 +195,31 @@ class GenerateAllCommand extends Command
         $this->info($file);
     }
 
-    public function createSchema($file, $modelName = null, $tableName = null){
-        if (is_null($modelName) && isset($file))
+    public function createSchema($file, $modelName = null, $tableName = null)
+    {
+        if (is_null($modelName) && isset($file)) {
             $modelName = studly_case(str_singular($this->filesystem->name($file)));
-        if (is_null($tableName) && isset($modelName))
+        }
+        if (is_null($tableName) && isset($modelName)) {
             $tableName = Str::snake(Str::plural($modelName));
+        }
         $fields = [];
         $relationships = [];
+
         return compact('file', 'modelName', 'tableName', 'fields', 'relationships');
     }
 
-    public function createPrimaryKey($fieldName){
+    public function createPrimaryKey($fieldName)
+    {
         return [
-            'fieldInput' => $fieldName.':increments',
-            'htmlType'   => '',
-            'validations'=> '',
-            'searchable' => false,
-            'fillable'   => false,
-            'primary'    => true,
-            'inForm'     => false,
-            'inIndex'    => false,
+            'fieldInput'  => $fieldName.':increments',
+            'htmlType'    => '',
+            'validations' => '',
+            'searchable'  => false,
+            'fillable'    => false,
+            'primary'     => true,
+            'inForm'      => false,
+            'inIndex'     => false,
         ];
     }
 }
