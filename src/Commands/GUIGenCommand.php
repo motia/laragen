@@ -46,6 +46,7 @@ class GUIGenCommand extends Command
      */
     public function handle()
     {
+        // FIXME remove this
         $process = new Process('.\resetdb.bat');
         $process->run();
         if (!$process->isSuccessful()) {
@@ -104,7 +105,6 @@ class GUIGenCommand extends Command
             $this->call($command, $options);
         }
 
-        // TODO function in construction
         $this->generateForeignKeyMigration();
 
         // project specific
@@ -137,9 +137,7 @@ class GUIGenCommand extends Command
             $fileContents = ($file) ? file_get_contents($file) : [];
             $schemaFields = json_decode($fileContents, true);
 
-            // returns $model => [$relationship1, $relationship2...]
             $pulledRelationships = GeneratorRelationshipInputUtil::pullRelationships($schemaFields, $modelName);
-            // echo json_encode($pulledRelationships);
             $foreignKeyFields = GeneratorRelationshipInputUtil::getForeignKeysColumn($pulledRelationships);
 
             $indexedSchemaFields = [];

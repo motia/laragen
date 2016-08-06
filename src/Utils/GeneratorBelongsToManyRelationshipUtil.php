@@ -131,7 +131,8 @@ class GeneratorBelongsToManyRelationshipUtil implements GeneratorRelationshipInp
     private static function preparePivotTableName($table1, $table2){
         $first = Str::singular(min($table1, $table2));
         $second = Str::singular(max($table1, $table2));
-        return Str::lower($first.'_'.$second);
+        // fixme name is not on the laravel standard to match the laravel-generator package
+        return Str::plural(Str::lower($first.'_'.$second));
     }
 
     /**
