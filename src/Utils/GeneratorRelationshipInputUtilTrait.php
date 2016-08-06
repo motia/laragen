@@ -69,7 +69,6 @@ trait GeneratorRelationshipInputUtilTrait
         $fkOptions['model'] = $model;
         $fkOptions['table'] = $table;
         $fkOptions['referencedModel'] = $referencedModel;
-        $fkOptions['referencedTable'] = &$fkOptions['on']; // HACK
         $fkOptions['relationshipName'] = $relationshipName;
 
         $defaultFKOptions = [
