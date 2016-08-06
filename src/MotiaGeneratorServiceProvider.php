@@ -33,13 +33,8 @@ class MotiaGeneratorServiceProvider extends ServiceProvider
             return new GenerateAllCommand();
         });
 
-        $this->app->singleton('motia:guigen', function ($app) {
-            return new GUIGenCommand();
-        });
-
         $this->commands([
             'motia:generate',
-            'motia:guigen',
         ]);
     }
 }

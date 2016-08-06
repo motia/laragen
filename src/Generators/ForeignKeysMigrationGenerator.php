@@ -44,6 +44,7 @@ class ForeignKeysMigrationGenerator
 
         //$this->commandData->commandComment("\nMigration created: ");
         //$this->commandData->commandInfo($fileName);
+        return $fileName;
     }
 
     private function generateTables()
