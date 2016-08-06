@@ -26,6 +26,8 @@ class GUIGenCommand extends Command
     protected $description = 'generates models and migration from json files';
 
     protected $filesystem;
+    protected $schemas;
+    protected $tableFkOptions;
 
     /**
      * Create a new command instance.
@@ -58,7 +60,7 @@ class GUIGenCommand extends Command
         $schemaFilesDirectory = 'resources/model_schemas/';
         $schemaFiles = $this->filesystem->glob($schemaFilesDirectory.'*.json');
 
-        $schemas = array_map(
+        $this->schemas = array_map(
             function ($file) {
                 $modelName = studly_case(str_singular($this->filesystem->name($file)));
                 $tableName = Str::snake(Str::plural($modelName));
@@ -68,20 +70,17 @@ class GUIGenCommand extends Command
             $schemaFiles
         );
 
-        $schemas = array_combine(array_column($schemas, 'modelName'), $schemas);
+        $this->schemas = array_combine(array_column($this->schemas, 'modelName'), $this->schemas);
 
         $postMigrationsDirectory = 'storage/myschema/post_migrations/';
 
         $this->deleteObsoleteMigrationFiles();
 
         // compiles schemas
-        $compiledModelSchemas = $this->compileModelSchemas($schemas);
-        //dd($compiledModelSchemas);
-        //dd(json_encode($modelSchemas));
+        $this->compileModelSchemas();
 
-        //die(json_encode($compiledModelSchemas));
-
-        foreach ($compiledModelSchemas as $compiledModelSchema) {
+        foreach ($this->schemas as $compiledModelSchema) {
+            // TODO skip models and stuff of unnecessary pivot tables
             $modelName = $compiledModelSchema['modelName'];
             $tableName = $compiledModelSchema['tableName'];
             $fields = &$compiledModelSchema['fields'];
@@ -104,6 +103,9 @@ class GUIGenCommand extends Command
             $this->call($command, $options);
         }
 
+        // TODO function in construction
+        $this->generateForeignKeyMigration($this->schemas);
+
         // project specific
         // copies some migrations files
         $filesToCopy = $this->filesystem->glob($postMigrationsDirectory.'*.php');
@@ -125,14 +127,13 @@ class GUIGenCommand extends Command
         }
     }
 
-    //  mutates modelSchemas, add
-    //  NOTE: fields defined in the schemaFile properties override those of the deduced foreign keys
-    public function compileModelSchemas($schemas)
+    //  fills the schemas and tableFkOptions attributes
+    public function compileModelSchemas()
     {
-        foreach ($schemas as $modelName => &$schema) {
+        foreach ($this->schemas as $modelName => &$schema) {
             $file = $schema['file'];
 
-            $fileContents = file_get_contents($file);
+            $fileContents = ($file) ? file_get_contents($file) : [];
             $schemaFields = json_decode($fileContents, true);
 
             // returns $model => [$relationship1, $relationship2...]
@@ -150,17 +151,30 @@ class GUIGenCommand extends Command
                 }
             }
 
-            //dd($pulledRelationships);
-            //dd($foreignKeyfields);
             $schema['fields'] = $indexedSchemaFields;
             $schema['relationships'] = $pulledRelationships;
 
             // populate relevant models deduced foreign
             foreach ($foreignKeyFields as $foreignKey) {
-                $fkName = $foreignKey['fkOptions']['field'];
-                $fkModel = $foreignKey['fkOptions']['model'];
+                $fkOptions = $foreignKey['fkOptions'];
+                $fkName = $fkOptions['field'];
+                $fkModel = $fkOptions['model'];
+                $fkTable = $fkOptions['table'];
 
-                $referencedSchema = &$schemas[$fkModel];
+                $this->tableFkOptions[$fkTable][$fkName] = $fkOptions;
+
+                if(!key_exists($fkModel, $this->schemas)){ // creates schema of a pivot table
+                    $this->schemas[$fkModel] = [
+                        'modelName' => $fkModel,
+                        'tableName' => $fkTable,
+                        'file'      => null,
+                        'relationships' => [],
+                        'fields' => [],
+                    ];
+                }
+                $referencedSchema = &$this->schemas[$fkModel];
+
+
                 if (!isset($referencedSchema['fields'][$fkName])) {
                     $referencedSchema['fields'][$fkName] = [];
                 }
@@ -168,10 +182,7 @@ class GUIGenCommand extends Command
                 // adds the old field properties(higher priority) to the deduced foreign keys
                 $referencedSchema['fields'][$fkName] =
                     array_merge($foreignKey, $referencedSchema['fields'][$fkName]);
-                //dd($referencedSchema);
             }
-
-            //$this->json_die($schema);
 
             foreach ($schema['fields'] as $field) {
                 $fieldName = strtok($field['fieldInput'], ':');
@@ -187,12 +198,23 @@ class GUIGenCommand extends Command
             }
         }
 
-        return $schemas;
-        //$this->json_die($schemas);
+    }
+
+    public function foreignKeyConstraint($fk){
+        $fkOptions = $fk['fkOptions'];
+        return 'foreign,'."'".$fkOptions['field']."'"
+            .':references,'."'".$fkOptions['references']."'"
+            .':on,'."'".$fkOptions['on']."'"
+            .':onUpdate,'."'".$fkOptions['onUpdate']."'"
+            .':onDelete,'."'".$fkOptions['onDelete']."'";
     }
 
     public function json_die($var)
     {
         die(json_encode($var));
+    }
+
+    public function generateForeignKeyMigration($compiledSchemas){
+        //TODO
     }
 }
