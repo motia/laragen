@@ -5,6 +5,7 @@ namespace Motia\Generator\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use Motia\Generator\Generators\ForeignKeysMigrationGenerator;
 use Motia\Generator\Utils\GeneratorRelationshipInputUtil;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
@@ -79,12 +80,12 @@ class GUIGenCommand extends Command
         // compiles schemas
         $this->compileModelSchemas();
 
-        foreach ($this->schemas as $compiledModelSchema) {
+        foreach ($this->schemas as $schema) {
             // TODO skip models and stuff of unnecessary pivot tables
-            $modelName = $compiledModelSchema['modelName'];
-            $tableName = $compiledModelSchema['tableName'];
-            $fields = &$compiledModelSchema['fields'];
-            $relationships = $compiledModelSchema['relationships'];
+            $modelName = $schema['modelName'];
+            $tableName = $schema['tableName'];
+            $fields = &$schema['fields'];
+            $relationships = $schema['relationships'];
 
             $jsonData = [
                 'migrate'       => true,
@@ -104,7 +105,7 @@ class GUIGenCommand extends Command
         }
 
         // TODO function in construction
-        $this->generateForeignKeyMigration($this->schemas);
+        $this->generateForeignKeyMigration();
 
         // project specific
         // copies some migrations files
@@ -200,21 +201,13 @@ class GUIGenCommand extends Command
 
     }
 
-    public function foreignKeyConstraint($fk){
-        $fkOptions = $fk['fkOptions'];
-        return 'foreign,'."'".$fkOptions['field']."'"
-            .':references,'."'".$fkOptions['references']."'"
-            .':on,'."'".$fkOptions['on']."'"
-            .':onUpdate,'."'".$fkOptions['onUpdate']."'"
-            .':onDelete,'."'".$fkOptions['onDelete']."'";
-    }
-
     public function json_die($var)
     {
         die(json_encode($var));
     }
 
-    public function generateForeignKeyMigration($compiledSchemas){
-        //TODO
+    public function generateForeignKeyMigration(){
+        $fkMigrationGenerator = new ForeignKeysMigrationGenerator($this->tableFkOptions);
+        $fkMigrationGenerator->generate();
     }
 }
