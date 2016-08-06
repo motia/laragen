@@ -3,12 +3,10 @@
  * Created by PhpStorm.
  * User: M
  * Date: 8/6/2016
- * Time: 1:21 AM
+ * Time: 1:21 AM.
  */
-
 namespace Motia\Generator\Generators;
 
-use File;
 use InfyOm\Generator\Common\CommandData;
 use InfyOm\Generator\Utils\FileUtil;
 use InfyOm\Generator\Utils\SchemaUtil;
@@ -58,8 +56,8 @@ class ForeignKeysMigrationGenerator
         }
 
         return [
-            'upTables' => implode(infy_nl(), $upTables),
-            'downTables' => implode(infy_nl(), $downTables)
+            'upTables'   => implode(infy_nl(), $upTables),
+            'downTables' => implode(infy_nl(), $downTables),
         ];
     }
 
@@ -75,23 +73,24 @@ class ForeignKeysMigrationGenerator
 
         $fields = [];
 
-        foreach ($this->tableFKsOptions[$table] as $FKOption){
+        foreach ($this->tableFKsOptions[$table] as $FKOption) {
             $field = $this->createAddForeignKeyField($FKOption);
             $fields[] = SchemaUtil::createField($field);
         }
         $fields = implode(infy_nl_tab(1, 3), $fields);
         $templateData = str_replace('$FIELDS$', $fields, $templateData);
+
         return $templateData;
     }
 
-    public function createAddForeignKeyField($fkOptions){
+    public function createAddForeignKeyField($fkOptions)
+    {
         return [
-            'fieldName' => $fkOptions['field'],
-            'databaseInputs' =>
-                'foreign:references,'."'".$fkOptions['references']."'"
+            'fieldName'      => $fkOptions['field'],
+            'databaseInputs' => 'foreign:references,'."'".$fkOptions['references']."'"
                 .':on,'."'".$fkOptions['on']."'"
                 .':onUpdate,'."'".$fkOptions['onUpdate']."'"
-                .':onDelete,'."'".$fkOptions['onDelete']."'"
+                .':onDelete,'."'".$fkOptions['onDelete']."'",
         ];
     }
 
@@ -102,19 +101,21 @@ class ForeignKeysMigrationGenerator
 
         $fields = [];
 
-        foreach ($this->tableFKsOptions[$table] as $FKOption){
+        foreach ($this->tableFKsOptions[$table] as $FKOption) {
             $field = $this->createDropForeignKeyField($FKOption);
             $fields[] = SchemaUtil::createField($field);
         }
 
         $fields = implode(infy_nl_tab(1, 3), $fields);
         $templateData = str_replace('$FIELDS$', $fields, $templateData);
+
         return $templateData;
     }
 
-    public function createDropForeignKeyField($fkOptions){
+    public function createDropForeignKeyField($fkOptions)
+    {
         return [
-            'fieldName' => $fkOptions['field'],
+            'fieldName'      => $fkOptions['field'],
             'databaseInputs' => 'dropForeign',
         ];
     }

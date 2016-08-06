@@ -105,20 +105,20 @@ class GeneratorHasManyRelationshipUtil implements GeneratorRelationshipInputUtil
         }
 
         return [
-            'relationshipInput'     => $relationshipInput,
-            'relationshipTitle'     => Str::title(str_replace('_', ' ', $relatedModel)),
-            'relationshipType'      => $relationshipType,
-            'relationshipName'      => $relationshipName,
-            'relationshipInputs'    => $relationshipInputs,
-            'htmlType'              => $htmlType,
-            'htmlTypeInputs'        => $htmlTypeInputs,
-            'validations'           => $validations,
-            'searchable'            => isset($relationshipSettings['searchable']) ? $relationshipSettings['searchable'] : false,
-            'fillable'              => isset($relationshipSettings['fillable']) ? $relationshipSettings['fillable'] : true,
-            'primary'               => isset($relationshipSettings['primary']) ? $relationshipSettings['primary'] : false,
-            'inForm'                => isset($relationshipSettings['inForm']) ? $relationshipSettings['inForm'] : true,
-            'inIndex'               => isset($relationshipSettings['inIndex']) ? $relationshipSettings['inIndex'] : true,
-            'fkFields'              => [$processedFKField],
+            'relationshipInput'  => $relationshipInput,
+            'relationshipTitle'  => Str::title(str_replace('_', ' ', $relatedModel)),
+            'relationshipType'   => $relationshipType,
+            'relationshipName'   => $relationshipName,
+            'relationshipInputs' => $relationshipInputs,
+            'htmlType'           => $htmlType,
+            'htmlTypeInputs'     => $htmlTypeInputs,
+            'validations'        => $validations,
+            'searchable'         => isset($relationshipSettings['searchable']) ? $relationshipSettings['searchable'] : false,
+            'fillable'           => isset($relationshipSettings['fillable']) ? $relationshipSettings['fillable'] : true,
+            'primary'            => isset($relationshipSettings['primary']) ? $relationshipSettings['primary'] : false,
+            'inForm'             => isset($relationshipSettings['inForm']) ? $relationshipSettings['inForm'] : true,
+            'inIndex'            => isset($relationshipSettings['inIndex']) ? $relationshipSettings['inIndex'] : true,
+            'fkFields'           => [$processedFKField],
         ];
     }
 }

@@ -87,11 +87,10 @@ trait GeneratorRelationshipInputUtilTrait
         $fkOptionsFromFieldInput = [];
         $otherDatabaseInputs = [];
 
-        $fkOptionsFromFieldInput['type']  = array_shift($fieldInputs);
+        $fkOptionsFromFieldInput['type'] = array_shift($fieldInputs);
         $fkOptionsFromFieldInput['field'] = array_shift($fieldInputs);
 
         foreach ($fieldInputs as $index => $fieldInput) {
-
             $tokens = explode(',', $fieldInput);
 
             if (count($tokens) == 1) {
