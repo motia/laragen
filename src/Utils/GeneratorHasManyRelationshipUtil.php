@@ -52,6 +52,7 @@ class GeneratorHasManyRelationshipUtil implements GeneratorRelationshipInputUtil
             'fillable'   => $fillable,
             'inForm'     => $inForm,
             'inIndex'    => $inIndex,
+            'fkFields'   => isset($relationship['fkFields']) ? $relationship['fkFields'] : [],
         ];
 
         return

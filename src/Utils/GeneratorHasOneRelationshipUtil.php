@@ -52,6 +52,7 @@ class GeneratorHasOneRelationshipUtil implements GeneratorRelationshipInputUtilI
             'fillable'   => $fillable,
             'inForm'     => $inForm,
             'inIndex'    => $inIndex,
+            'fkFields'   => isset($relationship['fkFields']) ? $relationship['fkFields'] : [],
         ];
 
         return
@@ -62,7 +63,7 @@ class GeneratorHasOneRelationshipUtil implements GeneratorRelationshipInputUtilI
     {
         $fieldInputs = explode(':', $relationInput);
 
-        if (count($fieldInputs) < 2 || $fieldInputs[0] != 'belongsTo') {
+        if (count($fieldInputs) < 2 || $fieldInputs[0] != 'hasOne') {
             return false;
         }
 
