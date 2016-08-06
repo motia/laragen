@@ -5,6 +5,7 @@ namespace Motia\Generator\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use InfyOm\Generator\Utils\GeneratorFieldsInputUtil;
 use Motia\Generator\Generators\ForeignKeysMigrationGenerator;
 use Motia\Generator\Utils\GeneratorRelationshipInputUtil;
 use Symfony\Component\Process\Exception\ProcessFailedException;
@@ -66,8 +67,9 @@ class GUIGenCommand extends Command
             function ($file) {
                 $modelName = studly_case(str_singular($this->filesystem->name($file)));
                 $tableName = Str::snake(Str::plural($modelName));
-
-                return compact('file', 'modelName', 'tableName');
+                $fields = [];
+                $relationships = [];
+                return compact('file', 'modelName', 'tableName', 'fields', 'relationships');
             },
             $schemaFiles
         );
@@ -77,15 +79,13 @@ class GUIGenCommand extends Command
         $postMigrationsDirectory = 'storage/myschema/post_migrations/';
 
         $this->deleteObsoleteMigrationFiles();
-
-        // compiles schemas
         $this->compileModelSchemas();
 
         foreach ($this->schemas as $schema) {
             // TODO skip models and stuff of unnecessary pivot tables
             $modelName = $schema['modelName'];
             $tableName = $schema['tableName'];
-            $fields = &$schema['fields'];
+            $fields = $schema['fields'];
             $relationships = $schema['relationships'];
 
             $jsonData = [
@@ -106,6 +106,7 @@ class GUIGenCommand extends Command
         }
 
         $this->generateForeignKeyMigration();
+        $this->call('migrate', []);
 
         // project specific
         // copies some migrations files
@@ -131,6 +132,7 @@ class GUIGenCommand extends Command
     //  fills the schemas and tableFkOptions attributes
     public function compileModelSchemas()
     {
+        echo '[';
         foreach ($this->schemas as $modelName => &$schema) {
             $file = $schema['file'];
 
@@ -153,7 +155,7 @@ class GUIGenCommand extends Command
             $schema['fields'] = $indexedSchemaFields;
             $schema['relationships'] = $pulledRelationships;
 
-            // populate relevant models deduced foreign
+            // populate relevant schemas with deduced foreign and primary keys
             foreach ($foreignKeyFields as $foreignKey) {
                 $fkOptions = $foreignKey['fkOptions'];
                 $fkName = $fkOptions['field'];
@@ -171,16 +173,23 @@ class GUIGenCommand extends Command
                         'fields' => [],
                     ];
                 }
-                $referencedSchema = &$this->schemas[$fkModel];
-
-
-                if (!isset($referencedSchema['fields'][$fkName])) {
-                    $referencedSchema['fields'][$fkName] = [];
+                unset($fkSchema);
+                $fkSchema = &$this->schemas[$fkModel];
+                if (!isset($fkSchema['fields'][$fkName])) {
+                    $fkSchema['fields'][$fkName] = [];
                 }
 
                 // adds the old field properties(higher priority) to the deduced foreign keys
-                $referencedSchema['fields'][$fkName] =
-                    array_merge($foreignKey, $referencedSchema['fields'][$fkName]);
+                $fkSchema['fields'][$fkName] =
+                    array_merge($foreignKey, $fkSchema['fields'][$fkName]);
+
+                $referencedModel = $fkOptions['referencedModel'];
+                $referencedField = $fkOptions['references'];
+                $referencedSchema = &$this->schemas[$referencedModel];
+                if(!isset($referencedSchema['fields'][$referencedField]))
+                    $referencedSchema['fields'][$referencedField] = [];
+                $referencedSchema['fields'][$referencedField] =
+                    array_merge($this->createPrimaryKey($referencedField), $referencedSchema['fields'][$referencedField]);
             }
 
             foreach ($schema['fields'] as $field) {
@@ -195,8 +204,10 @@ class GUIGenCommand extends Command
                     $schema['fields'][$fieldName] = $field;
                 }
             }
+            echo json_encode($this->schemas);
+            echo ',';
         }
-
+        echo ']';
     }
 
     public function json_die($var)
@@ -207,5 +218,18 @@ class GUIGenCommand extends Command
     public function generateForeignKeyMigration(){
         $fkMigrationGenerator = new ForeignKeysMigrationGenerator($this->tableFkOptions);
         $fkMigrationGenerator->generate();
+    }
+
+    public function createPrimaryKey($fieldName){
+        return [
+            'fieldInput' => $fieldName.':increments',
+            'htmlType'   => '',
+            'validations'=> '',
+            'searchable' => false,
+            'fillable'   => false,
+            'primary'    => true,
+            'inForm'     => false,
+            'inIndex'    => false,
+        ];
     }
 }

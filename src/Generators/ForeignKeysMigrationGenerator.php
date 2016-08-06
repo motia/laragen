@@ -38,7 +38,7 @@ class ForeignKeysMigrationGenerator
 
         $templateData = str_replace('$DOWN_TABLES$', $tables['downTables'], $templateData);
 
-        $fileName = date('Y_m_d_His').'_add_foreign_key_constraints.php';
+        $fileName = date('Y_m_d_His', time() + 1).'_add_foreign_key_constraints.php';
 
         FileUtil::createFile($this->path, $fileName, $templateData);
 
