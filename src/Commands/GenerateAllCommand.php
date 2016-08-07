@@ -15,7 +15,7 @@ class GenerateAllCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'motia:guigen';
+    protected $signature = 'motia:generate';
 
     /**
      * The console command description.
