@@ -77,25 +77,18 @@ class GeneratorHasOneRelationshipUtil implements GeneratorRelationshipInputUtilI
     {
         $relationshipInputs = explode(':', $relationshipInput);
 
-        // modelname ; relationtype,relatedModel,fk1,fk2; eloquentinput1 ; eloquentinput2 ...
         $modelName = array_shift($relationshipInputs);
         $tableName = Str::snake(Str::plural($modelName));
 
-        // relationtype,relatedModel,fk1,fk2 , eloquentinput1 , eloquentinput2 ...
         $requiredRelationshipInput = $relationshipInputs[0];
         $requiredRelationshipInputs = explode(',', $requiredRelationshipInput);
 
         $relationshipType = array_shift($requiredRelationshipInputs);
         $relatedModel = array_shift($requiredRelationshipInputs);
-        $relatedTable = Str::snake(Str::plural($relatedModel));
-        $relationshipName = $relatedModel;
-        //
+        $relatedTable = Str::snake(Str::plural($relatedModel)); // fixme relatedTable not always deduced that way
+        $relationshipName = (str_contains($relationshipType, 'Many')) ?  Str::plural($relatedModel) : $relatedModel;
 
-        $fkField = isset($relationshipSettings['fkFields'][0]) ?
-            $relationshipSettings['fkFields'][0] : [];
-
-        // TODO
-        $processedFKField = self::validateForeignKeyField($fkField, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName);
+        $fkFields = self::prepareForeignKeys($relationshipSettings, $relationshipType, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName);
 
         $htmlTypeInputs = explode(':', $htmlType);
         $htmlType = array_shift($htmlTypeInputs);
@@ -118,7 +111,46 @@ class GeneratorHasOneRelationshipUtil implements GeneratorRelationshipInputUtilI
             'primary'            => isset($relationshipSettings['primary']) ? $relationshipSettings['primary'] : false,
             'inForm'             => isset($relationshipSettings['inForm']) ? $relationshipSettings['inForm'] : true,
             'inIndex'            => isset($relationshipSettings['inIndex']) ? $relationshipSettings['inIndex'] : true,
-            'fkFields'           => [$processedFKField],
+            'fkFields'           => $fkFields,
         ];
+    }
+
+    /**
+     * @param $relationshipSettings
+     * @param $relationshipType
+     * @param $relatedModel
+     * @param $relatedTable
+     * @param $modelName
+     * @param $tableName
+     * @param $relationshipName
+     * @return array
+     */
+    private static function prepareForeignKeys($relationshipSettings, $relationshipType, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName)
+    {
+        $fkFields = [];
+        if ($relationshipType == 'hasOne' && $relationshipType == 'hasMany') {
+            $fkField = isset($relationshipSettings['fkFields'][0]) ?
+                $relationshipSettings['fkFields'][0] : [];
+
+            $fkFields[] = self::validateForeignKeyField($fkField, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName);
+            return array($fkFields, $relationshipSettings);
+        } elseif ($relationshipType == 'belongsTo') {
+            $fkField = isset($relationshipSettings['fkFields'][0]) ?
+                $relationshipSettings['fkFields'][0] : [];
+
+            $fkFields[] = self::validateForeignKeyField($fkField, $modelName, $tableName, $relatedModel, $relatedTable, $relationshipName);
+            return array($fkFields, $relationshipSettings);
+        } else {
+            $fkField1 = isset($relationshipSettings['fkFields'][0]) ? $relationshipSettings['fkFields'][0] : [];
+            $fkField2 = isset($relationshipSettings['fkFields'][1]) ? $relationshipSettings['fkFields'][1] : [];
+
+            // TODO support custom pivot table names
+            $pivotTable = self::preparePivotTableName($modelName, $relatedModel);
+            $pivotModel = self::generateModelNameFromTableName($pivotTable);
+
+            $fkFields[] = self::validateForeignKeyField($fkField1, $pivotModel, $pivotTable, $modelName, $tableName, $relationshipName);
+            $fkFields[] = self::validateForeignKeyField($fkField2, $pivotModel, $pivotTable, $relatedModel, $relatedTable, $relationshipName);
+            return $fkFields;
+        }
     }
 }

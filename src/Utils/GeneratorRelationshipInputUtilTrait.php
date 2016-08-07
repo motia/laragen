@@ -127,19 +127,34 @@ trait GeneratorRelationshipInputUtilTrait
             .':'.$fkOptions['type']
             .implode(',', $otherDatabaseInputs);
 
-        $result = compact('fieldInput', 'fkOptions');
-        /*
-            'searchable' => $foreignKeyField['searchable'],
-            'fillable'   => $foreignKeyField['fillable'],
-            'primary'    => $foreignKeyField['primary'],
-            'inForm'     => $foreignKeyField['inForm'],
-            'inIndex'    => $foreignKeyField['index'],
+        return [
+            'fieldInput'  => $fieldInput,
+            'fkOptions'   => $fkOptions,
+            'htmlType'    => isset($foreignKeyField['htmlType']) ? $foreignKeyField['htmlType'] : 'text',
+            'validations' => isset($foreignKeyField['validations']) ? $foreignKeyField['validations'] : '',
+            'searchable'  => isset($foreignKeyField['searchable']) ? $foreignKeyField['searchable'] : true,
+            'fillable'    => isset($foreignKeyField['fillable']) ? $foreignKeyField['fillable'] : true,
+            'primary'     => isset($foreignKeyField['primary']) ? $foreignKeyField['primary'] : false,
+            'inForm'      => isset($foreignKeyField['inForm']) ? $foreignKeyField['inForm'] : true,
+            'inIndex'     => isset($foreignKeyField['inForm']) ? $foreignKeyField['inForm'] : true,
         ];
+    }
 
-        //TODO
-        $htmlType = $foreignKeyField['htmlType'];
-        $validations = $foreignKeyField['validations'];
-        */
-        return $result;
+    private static function preparePivotTableName($table1, $table2)
+    {
+        $first = Str::singular(min($table1, $table2));
+        $second = Str::singular(max($table1, $table2));
+        // fixme name is not on the laravel standard to match the laravel-generator package
+        return Str::plural(Str::lower($first.'_'.$second));
+    }
+
+    /**
+     * @param string $table
+     *
+     * @return string
+     */
+    private static function generateModelNameFromTableName($table)
+    {
+        return ucfirst(camel_case(str_singular($table)));
     }
 }
