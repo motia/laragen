@@ -22,6 +22,7 @@ Laragen is a API/Scaffold laravel generator package. It wraps the [laravel-gener
 	    "require": {
 			...
 	        "motia/laragen": "dev-master",
+	        "infyomlabs/laravel-generator": "motia_relationships"
 	    }
  2. Follow the instructions to install [laravel-generator](https://github.com/motia/laravel-generator/)
  3. Add the package service provider
