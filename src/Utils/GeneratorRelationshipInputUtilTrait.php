@@ -53,7 +53,7 @@ trait GeneratorRelationshipInputUtilTrait
         return $pulledRelationships;
     }
 
-    public static function getForeignKeysColumn($pulledRelationships)
+    public static function getForeignKeyColumns($pulledRelationships)
     {
         $result = [];
         foreach ($pulledRelationships as $relationship) {
@@ -156,5 +156,42 @@ trait GeneratorRelationshipInputUtilTrait
     private static function generateModelNameFromTableName($table)
     {
         return ucfirst(camel_case(str_singular($table)));
+    }
+
+    /**
+     * @param $relationshipSettings
+     * @param $relationshipType
+     * @param $relatedModel
+     * @param $relatedTable
+     * @param $modelName
+     * @param $tableName
+     * @param $relationshipName
+     * @return array
+     */
+    private static function prepareForeignKeys($relationshipSettings, $relationshipType, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName)
+    {
+        $fkFields = [];
+        if ($relationshipType == 'hasOne' || $relationshipType == 'hasMany') {
+            $fkField = isset($relationshipSettings['fkFields'][0]) ?
+                $relationshipSettings['fkFields'][0] : [];
+
+            $fkFields[] = self::validateForeignKeyField($fkField, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName);
+        } elseif ($relationshipType == 'belongsTo') {
+            $fkField = isset($relationshipSettings['fkFields'][0]) ?
+                $relationshipSettings['fkFields'][0] : [];
+
+            $fkFields[] = self::validateForeignKeyField($fkField, $modelName, $tableName, $relatedModel, $relatedTable, $relationshipName);
+        } else { // belongsToMany
+            $fkField1 = isset($relationshipSettings['fkFields'][0]) ? $relationshipSettings['fkFields'][0] : [];
+            $fkField2 = isset($relationshipSettings['fkFields'][1]) ? $relationshipSettings['fkFields'][1] : [];
+
+            // TODO support custom pivot table names
+            $pivotTable = self::preparePivotTableName($modelName, $relatedModel);
+            $pivotModel = self::generateModelNameFromTableName($pivotTable);
+
+            $fkFields[] = self::validateForeignKeyField($fkField1, $pivotModel, $pivotTable, $modelName, $tableName, $relationshipName);
+            $fkFields[] = self::validateForeignKeyField($fkField2, $pivotModel, $pivotTable, $relatedModel, $relatedTable, $relationshipName);
+        }
+        return $fkFields;
     }
 }

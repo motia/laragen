@@ -109,11 +109,11 @@ class GenerateAllCommand extends Command
         foreach ($this->schemas as $modelName => &$schema) {
             $file = $schema['file'];
 
-            $fileContents = ($file) ? file_get_contents($file) : [];
+            $fileContents = ($file) ? file_get_contents($file) : '[]';
             $schemaFields = json_decode($fileContents, true);
 
             $pulledRelationships = GeneratorRelationshipInputUtil::pullRelationships($schemaFields, $modelName);
-            $foreignKeyFields = GeneratorRelationshipInputUtil::getForeignKeysColumn($pulledRelationships);
+            $foreignKeyFields = GeneratorRelationshipInputUtil::getForeignKeyColumns($pulledRelationships);
 
             $indexedSchemaFields = [];
 
