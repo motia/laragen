@@ -4,37 +4,18 @@ namespace Motia\Generator\Utils;
 
 use Illuminate\Support\Str;
 
+/**
+ * Class GeneratorRelationshipInputUtilTrait
+ * @package Motia\Generator\Utils
+ */
 trait GeneratorRelationshipInputUtilTrait
 {
-    public static function prepareKeyValueArrayStr($arr)
-    {
-        $arrStr = '[';
-        foreach ($arr as $item) {
-            $arrStr .= "'$item' => '$item', ";
-        }
-
-        $arrStr = substr($arrStr, 0, strlen($arrStr) - 2);
-
-        $arrStr .= ']';
-
-        return $arrStr;
-    }
-
-    public static function prepareValuesArrayStr($arr)
-    {
-        $arrStr = '[';
-        foreach ($arr as $item) {
-            $arrStr .= "'$item', ";
-        }
-
-        $arrStr = substr($arrStr, 0, strlen($arrStr) - 2);
-
-        $arrStr .= ']';
-
-        return $arrStr;
-    }
-
-    public static function pullRelationships(&$jsonData, $modelName = '')
+    /**
+     * @param  array $jsonData
+     * @param  string $modelName
+     * @return  array
+     */
+    public static function pullRelationships(array &$jsonData, $modelName = '')
     {
         $modelName .= ':';
         $pulledRelationships = [];
@@ -53,7 +34,11 @@ trait GeneratorRelationshipInputUtilTrait
         return $pulledRelationships;
     }
 
-    public static function getForeignKeyColumns($pulledRelationships)
+    /**
+     * @param  array $pulledRelationships
+     * @return  array
+     */
+    public static function getForeignKeyColumns(array $pulledRelationships)
     {
         $result = [];
         foreach ($pulledRelationships as $relationship) {
@@ -63,6 +48,15 @@ trait GeneratorRelationshipInputUtilTrait
         return $result;
     }
 
+    /**
+     * @param  array $foreignKeyField
+     * @param  string $model
+     * @param  string $table
+     * @param  string $referencedModel
+     * @param  string $referencedTable
+     * @param  string $relationshipName
+     * @return   array
+     */
     public static function validateForeignKeyField($foreignKeyField, $model, $table, $referencedModel, $referencedTable, $relationshipName)
     {
         $fkOptions = isset($foreignKeyField['fkOptions']) ? $foreignKeyField['fkOptions'] : [];
@@ -140,6 +134,11 @@ trait GeneratorRelationshipInputUtilTrait
         ];
     }
 
+    /**
+     * @param  string $table1
+     * @param  string $table2
+     * @return string
+     */
     private static function preparePivotTableName($table1, $table2)
     {
         $first = Str::singular(min($table1, $table2));
@@ -149,9 +148,9 @@ trait GeneratorRelationshipInputUtilTrait
     }
 
     /**
-     * @param string $table
+     * @param  string $table
      *
-     * @return string
+     * @return  string
      */
     private static function generateModelNameFromTableName($table)
     {
@@ -159,16 +158,17 @@ trait GeneratorRelationshipInputUtilTrait
     }
 
     /**
-     * @param $relationshipSettings
-     * @param $relationshipType
-     * @param $relatedModel
-     * @param $relatedTable
-     * @param $modelName
-     * @param $tableName
-     * @param $relationshipName
+     * @param  array $relationshipSettings
+     * @param  string $relationshipType
+     * @param  string $relatedModel
+     * @param  string $relatedTable
+     * @param  string $modelName
+     * @param  string $tableName
+     * @param  string  $relationshipName
+     *
      * @return array
      */
-    private static function prepareForeignKeys($relationshipSettings, $relationshipType, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName)
+    private static function prepareForeignKeys(array $relationshipSettings, $relationshipType, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName)
     {
         $fkFields = [];
         if ($relationshipType == 'hasOne' || $relationshipType == 'hasMany') {

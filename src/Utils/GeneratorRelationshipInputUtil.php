@@ -101,7 +101,7 @@ class GeneratorRelationshipInputUtil
         $relationshipType = array_shift($requiredRelationshipInputs);
         $relatedModel = array_shift($requiredRelationshipInputs);
         $relatedTable = Str::snake(Str::plural($relatedModel)); // fixme relatedTable not always deduced that way
-        $relationshipName = (str_contains($relationshipType, 'Many')) ?  Str::plural($relatedModel) : $relatedModel;
+        $relationshipName = (str_contains($relationshipType, 'Many')) ? Str::plural($relatedModel) : $relatedModel;
 
         $fkFields = self::prepareForeignKeys($relationshipSettings, $relationshipType, $relatedModel, $relatedTable, $modelName, $tableName, $relationshipName);
 
