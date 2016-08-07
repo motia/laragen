@@ -114,8 +114,9 @@ class ForeignKeysMigrationGenerator
 
     public function createDropForeignKeyField($fkOptions)
     {
+        $constraintName = $fkOptions['table'].'_'.$fkOptions['field'].'_foreign';
         return [
-            'fieldName'      => $fkOptions['field'],
+            'fieldName'      => $constraintName,
             'databaseInputs' => 'dropForeign',
         ];
     }

@@ -24,6 +24,7 @@ class GenerateAllCommand extends Command
      */
     protected $description = 'generates models and migration from json files';
 
+    protected $composer;
     protected $filesystem;
     protected $schemas;
     protected $tableFkOptions;
@@ -34,6 +35,7 @@ class GenerateAllCommand extends Command
     public function __construct()
     {
         parent::__construct();
+        $this->composer = app()['composer'];
         $this->filesystem = new Filesystem();
     }
 
@@ -89,6 +91,9 @@ class GenerateAllCommand extends Command
 
         $this->generateForeignKeyMigration();
         $this->call('migrate', []);
+        
+        $this->info('Generating autoload files');
+        $this->composer->dumpOptimized();
     }
 
     public function deleteObsoleteMigrationFiles()
