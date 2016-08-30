@@ -49,12 +49,13 @@ class GenerateAllCommand extends Command
         // generation configuration for all models
         $command = 'infyom:api_scaffold';
         $generatorOptions = ['paginate' => '15', 'skip' => 'dump-autoload'];
-        $generatorAddOns = ['swagger' => true, 'datatable' => true];
+        $generatorAddOns = ['swagger' => false, 'datatable' => false];
 
         $schemaFilesDirectory = 'resources/model_schemas/';
         $schemaFiles = $this->filesystem->glob($schemaFilesDirectory.'*.json');
 
         foreach ($schemaFiles as $file) {
+
             $this->schemas[] = $this->createSchema($file);
         }
 
@@ -73,7 +74,7 @@ class GenerateAllCommand extends Command
             $relationships = $schema['relationships'];
 
             $jsonData = [
-                'migrate'       => true,
+                'migrate'       => false,
                 'fields'        => $fields,
                 'relationships' => $relationships,
                 'tableName'     => $tableName,
@@ -90,8 +91,9 @@ class GenerateAllCommand extends Command
         }
 
         $this->generateForeignKeyMigration();
-        $this->call('migrate', []);
-        
+        //$this->call('migrate', []);
+
+
         $this->info('Generating autoload files');
         $this->composer->dumpOptimized();
     }
@@ -152,7 +154,8 @@ class GenerateAllCommand extends Command
                         'fields'        => [],
                     ];
                 }
-                unset($fkSchema);
+
+                unset($fkSchema); // HACK unbinds reference to last iteration..
                 $fkSchema = &$this->schemas[$fkModel];
                 if (!isset($fkSchema['fields'][$fkName])) {
                     $fkSchema['fields'][$fkName] = [];
@@ -163,8 +166,8 @@ class GenerateAllCommand extends Command
                     array_merge($foreignKey, $fkSchema['fields'][$fkName]);
 
                 // populates primary keys
-                $referencedModel = $fkOptions['referencedModel'];
                 $referencedField = $fkOptions['references'];
+                $referencedModel = $fkOptions['referencedModel'];
 
                 unset($referencedSchema);
                 $referencedSchema = &$this->schemas[$referencedModel];
