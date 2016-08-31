@@ -1,40 +1,80 @@
 <?php
 
 
-namespace InfyOm\Generator\Common;
+namespace Motia\Generator\Common;
 
 use Illuminate\Support\Str;
+use Motia\Generator\Common\ForeignKeyMap;
+use Motia\Generator\Common\SchemaForeignKey;
+use Symfony\Component\Console\Exception\RuntimeException;
+
+
+function hashPivot($model1, $model2)
+{
+    if ($model1 < $model2) {
+        return $model1 . '.' . $model2;
+    } else {
+        return $model2 . '.' . $model1;
+    }
+}
 
 class ModelSchema
 {
-    public $fileName;
+    /** @var ModelSchema[] */
+    public static $modelSchemas = [];
+    /** @var bool[] */
+    public static $pivotHasModel = [];
+    /** @var string  */
+    public static $wildCard = '?';
+    /** @var ForeignKeyMap */
+    public $foreignKeyMap;
+    /**
+     * @var null|string
+     */
+    public $file;
     public $modelName;
     public $tableName;
-    public $fields;
-    public $relationships;
-    public $deducedForeignKeys;
-    protected $primaryKey;
-    private $parsed = false;
 
-    public function __construct($schemaFile = null, $modelName = null, $tableName = null)
+    /** @var  string */
+    protected $primaryKey;
+    /** @var array  */
+    public $fields = [];
+    public $relationships = [];
+
+    /**
+     * ModelSchema constructor.
+     * @param string|null $file
+     * @param string|null $modelName
+     * @param string|null $table
+     */
+    public function __construct($file = null, $modelName = null, $table = null)
     {
-        if (isset($schemaFile)) {
-            $this->fileName = $schemaFile;
+        if (isset($file)) {
+            $this->file = $file;
         }
 
-        if (is_null($modelName) && isset($file)) {
+        if (isset($modelName)) {
+            $this->modelName = $modelName;
+        } elseif (isset($file)) {
             // take the model_schema file name as the model name
             $baseName = basename($file, '.json');
+
             $this->modelName = Str::studly(Str::singular($baseName));
         }
 
-        if (is_null($tableName) && isset($modelName)) {
-            $this->tableName = Str::snake(Str::plural($modelName));
+        if (isset($table)) {
+            $this->tableName = $table;
+        } elseif (isset($this->modelName)) {
+            $this->tableName = Str::snake(Str::plural($this->modelName));
+        }
+
+        if (isset($this->modelName)) {
+            self::$modelSchemas[$this->modelName] = $this;
         }
     }
 
     /**
-     * @return mixed
+     * @return string
      */
     public function getPrimaryKey()
     {
@@ -42,101 +82,162 @@ class ModelSchema
     }
 
     /**
-     * @param mixed $primaryKey
+     * @param string $primaryKey
      */
     public function setPrimaryKey($primaryKey)
     {
-        $this->primaryKey = $primaryKey;
+        if (empty($this->primaryKey) || $this->primaryKey == self::$wildCard) {
+            $this->primaryKey = $primaryKey;
+            return;
+        }
+
+        if ($primaryKey != $this->primaryKey) {
+            throw new RuntimeException("primary key inconsistency for $this->modelName primary key \n
+             old value = $this->primaryKey and new value = $primaryKey");
+        }
     }
 
     public function parseDataFromFile()
     {
-        $jsonData = $this->getSchemaRawData();
-        $this->parseData($jsonData);
+        if (isset($this->file)) {
+            // TODO catch fileIO exception
+            $jsonData = json_decode(file_get_contents($this->file), true);
+            $this->parseData($jsonData);
+        } else {
+            throw new RuntimeException("no file name for model/table $this->modelName/$this->tableName");
+        }
     }
 
-    private function getSchemaRawData()
-    {
-        if(isset($this->fileName))
-            return json_decode(file_get_contents($this->fileName), true);
-
-        return [];
-    }
-
+    /**
+     * @param array $jsonData
+     */
     private function parseData(array $jsonData)
     {
         foreach ($jsonData as $field) {
             $fieldType = self::getFieldType($field);
+
             if ($fieldType == 'field' || $fieldType == 'primary') {
                 // fields are indexed for simpler search later
-                $fieldName = self::getFieldName($field['fieldInput']);
+                $fieldName = $field['name'];
                 $this->fields[$fieldName] = $field;
 
                 if ($fieldType == 'primary') {
-                    // TODO check for primary key inconsistency
-                    $this->setPrimary($fieldName);
+                    // TODO handle primary key inconsistency exception
+                    $this->setPrimaryKey($field['name']);
                 }
 
-            } elseif ($this->getFieldType($field) == 'relationship') {
+            } elseif ($fieldType == 'relation') {
                 $this->parseRelationship($field);
+            } else {
+                throw new RuntimeException("wrong field type inside $this->file: \n"
+                    . json_encode($field));
             }
         }
 
-        $this->parsed = true;
-    }
-
-    private static function getFieldType($field)
-    {
-        // TODO
-        // returns 'field', 'relationship', 'primary' ,'index'
-        return 'field';
-    }
-
-    public static function getFieldName($field)
-    {
-        return strtok($field['fieldInput'], ':');
     }
 
     /**
-     * @param $fieldName
-     * @param bool $checkCollision
-     * @return bool
+     * @param array $field
+     * @return string
      */
-    private function setPrimary($fieldName, $checkCollision = true)
+    private static function getFieldType(array $field)
     {
-        if ($fieldName != $this->primaryKey) {
-            return true;
+        if (isset($field['primary'])) {
+            return 'primary';
         }
 
-        $this->primaryKey = $fieldName;
-        return false;
-    }
+        if (isset($field['relation'])) {
+            return 'relation';
+        }
 
-    private function parseRelationship($field)
-    {
-        // TODO parse relationship
-        // TODO fill the foreign keys and relationships attributes
+        if (isset($field['name'])) {
+            return 'field';
+        }
+
+        return '';
     }
 
     /**
-     * @return boolean
+     * @param array $field
      */
-    public function isParsed()
+    private function parseRelationship(array $field)
     {
-        return $this->parsed;
+        dump($this->modelName);
+        $relationInputs = explode(',', $field['relation']);
+
+        $relationType = array_shift($relationInputs);
+        $relatedModel = array_shift($relationInputs);
+
+        if (!isset($field['type']) && ($relationType == '1t1' || $relationType == 'mt1')) {
+            // belongsTo relations
+            $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
+            $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
+
+            $this->updateForeignKeyFromRelation([
+                'model' => $this->modelName,
+                'refModel' => $relatedModel,
+                'localKey' => $foreignKey,
+                'otherKey' => $otherKey,
+            ]);
+
+        } elseif ($relationType == '1tm' || $relationType == '1t1') {
+            // hasOne and hasMany relations
+            $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
+            $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
+
+            $this->updateForeignKeyFromRelation([
+                'model' => $relatedModel,
+                'refModel' => $this->modelName,
+                'localKey' => $foreignKey,
+                'otherKey' => $otherKey,
+            ]);
+        } elseif ($relationType == 'mtm') {
+            // belongsToMany relations
+            $pivotModel = array_pull($field, 'pivotModel'); // can be null
+            if ($pivotModel === null) {
+                $pivotModel = hashPivot($this->modelName, $relatedModel);
+                self::$pivotHasModel[$pivotModel] = false;
+            } else {
+                self::$pivotHasModel[$pivotModel] = false;
+            }
+            $pivotTable = (empty($relationInputs)) ? null : array_shift($relationInputs);
+            $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
+            $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
+
+            $localConfig = [
+                'model' => $pivotModel,
+                'refModel' => $this->modelName,
+                'otherKey' => $foreignKey,
+                'table' => $pivotTable,
+            ];
+
+            $otherConfig = [
+                'model' => $pivotModel,
+                'refModel' => $relatedModel,
+                'otherKey' => $otherKey,
+                'table' => $pivotTable,
+            ];
+
+            $this->updateForeignKeyFromRelation($otherConfig);
+            $this->updateForeignKeyFromRelation($localConfig);
+
+        }
     }
 
-    public function getDeducedForeignKeys()
+    private function updateForeignKeyFromRelation($fkSettings, $fieldSettings = [])
     {
-        return $this->deducedForeignKeys;
+        $this->foreignKeyMap->updateOrStoreForeignKey($fkSettings, $fieldSettings, false);
     }
 
-    public function mergeForeignKeyFields(CompilationSchema $otherSchema, $fkName)
+    public function appendInverseRelationship($relationship)
     {
-
+        //todo
     }
 
-    public function appendInverseRelationship($relationship){
-
+    public function registerForeignKeyMap(ForeignKeyMap $foreignKeyMap)
+    {
+        $this->foreignKeyMap = $foreignKeyMap;
+        $foreignKeyMap->registerModel($this->modelName);
     }
+
 }
