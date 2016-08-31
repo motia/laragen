@@ -133,7 +133,6 @@ class ModelSchema
                     . json_encode($field));
             }
         }
-
     }
 
     /**
@@ -198,7 +197,7 @@ class ModelSchema
                 $pivotModel = hashPivot($this->modelName, $relatedModel);
                 self::$pivotHasModel[$pivotModel] = false;
             } else {
-                self::$pivotHasModel[$pivotModel] = false;
+                self::$pivotHasModel[$pivotModel] = true;
             }
             $pivotTable = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
@@ -220,7 +219,6 @@ class ModelSchema
 
             $this->updateForeignKeyFromRelation($otherConfig);
             $this->updateForeignKeyFromRelation($localConfig);
-
         }
     }
 
