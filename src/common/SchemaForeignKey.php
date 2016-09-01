@@ -93,9 +93,4 @@ class SchemaForeignKey
     {
         // todo
     }
-
-    public function combine(SchemaForeignKey $foreignKey)
-    {
-
-    }
 }

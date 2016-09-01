@@ -9,19 +9,8 @@ use Motia\Generator\Common\SchemaForeignKey;
 use Symfony\Component\Console\Exception\RuntimeException;
 
 
-function hashPivot($model1, $model2)
-{
-    if ($model1 < $model2) {
-        return $model1 . '.' . $model2;
-    } else {
-        return $model2 . '.' . $model1;
-    }
-}
-
 class ModelSchema
 {
-    /** @var ModelSchema[] */
-    public static $modelSchemas = [];
     /** @var bool[] */
     public static $pivotHasModel = [];
     /** @var string  */
@@ -66,10 +55,6 @@ class ModelSchema
             $this->tableName = $table;
         } elseif (isset($this->modelName)) {
             $this->tableName = Str::snake(Str::plural($this->modelName));
-        }
-
-        if (isset($this->modelName)) {
-            self::$modelSchemas[$this->modelName] = $this;
         }
     }
 
@@ -189,16 +174,19 @@ class ModelSchema
                 'refModel' => $this->modelName,
                 'localKey' => $foreignKey,
                 'otherKey' => $otherKey,
-            ]);
+            ], $field);
         } elseif ($relationType == 'mtm') {
             // belongsToMany relations
             $pivotModel = array_pull($field, 'pivotModel'); // can be null
             if ($pivotModel === null) {
-                $pivotModel = hashPivot($this->modelName, $relatedModel);
+                $pivotModel = min($this->modelName, $relatedModel).' '.max($this->modelName, $relatedModel);
                 self::$pivotHasModel[$pivotModel] = false;
             } else {
                 self::$pivotHasModel[$pivotModel] = true;
             }
+            if(!$this->foreignKeyMap->hasModel($pivotModel))
+                $this->foreignKeyMap->registerModel($pivotModel);
+
             $pivotTable = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);

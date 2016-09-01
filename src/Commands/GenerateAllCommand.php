@@ -61,12 +61,13 @@ class GenerateAllCommand extends Command
         $schemaFilesDirectory = 'resources/model_schemas/';
         $schemaFiles = $this->filesystem->glob($schemaFilesDirectory . '*.json');
 
+        $this->foreignKeyMap = new ForeignKeyMap();
         foreach ($schemaFiles as $file) {
             $modelSchema = new ModelSchema($file);
+            $modelSchema->registerForeignKeyMap($this->foreignKeyMap);
+
             $this->schemas[$modelSchema->modelName] = $modelSchema;
-
         }
-
 
         $this->deleteObsoleteMigrationFiles();
         $this->compileModelSchemas();
@@ -74,7 +75,7 @@ class GenerateAllCommand extends Command
         foreach ($this->schemas as $schema) {
             // TODO skip models,repositories for pivot tables
             $modelName = $schema->modelName;
-            $tableName = $schema->modelName;
+            $tableName = $schema->tableName;
             $fields = $schema->fields;
             //$relationships = $schema->relationships;
 
@@ -124,15 +125,14 @@ class GenerateAllCommand extends Command
     // fills the schemas and tableFkOptions attributes
     public function compileModelSchemas()
     {
-        $this->foreignKeyMap = new ForeignKeyMap();
-        foreach ($this->schemas as &$schema) {
-            $schema->registerForeignKeyMap($this->foreignKeyMap);
-            $schema->parseDataFromFile();
 
+        foreach ($this->schemas as &$schema) {
+            $schema->parseDataFromFile();
         }
 
         dump('_________________________________');
         dump('schema compiled');
+        die(dump($this->foreignKeyMap->getMap()));
         dd();
     }
 
