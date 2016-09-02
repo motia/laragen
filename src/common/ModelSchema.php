@@ -4,31 +4,32 @@
 namespace Motia\Generator\Common;
 
 use Illuminate\Support\Str;
-use Motia\Generator\Common\ForeignKeyMap;
-use Motia\Generator\Common\SchemaForeignKey;
 use Symfony\Component\Console\Exception\RuntimeException;
 
 
 class ModelSchema
 {
+    const WILD_CARD = '?';
+    const SEPARATE_FOREIGN_MIGRATION = true;
+
     /** @var bool[] */
-    public static $pivotHasModel = [];
-    /** @var string  */
-    public static $wildCard = '?';
     /** @var ForeignKeyMap */
     public $foreignKeyMap;
+    /** @var  $command */
+    public $command;
+
     /**
      * @var null|string
      */
     public $file;
     public $modelName;
     public $tableName;
-
-    /** @var  string */
-    protected $primaryKey;
-    /** @var array  */
+    /** @var array */
     public $fields = [];
     public $relationships = [];
+    public $createRelationInverse = true;
+    /** @var  string */
+    protected $primaryKey;
 
     /**
      * ModelSchema constructor.
@@ -71,7 +72,7 @@ class ModelSchema
      */
     public function setPrimaryKey($primaryKey)
     {
-        if (empty($this->primaryKey) || $this->primaryKey == self::$wildCard) {
+        if (empty($this->primaryKey) || $this->primaryKey == ModelSchema::WILD_CARD) {
             $this->primaryKey = $primaryKey;
             return;
         }
@@ -85,8 +86,10 @@ class ModelSchema
     public function parseDataFromFile()
     {
         if (isset($this->file)) {
-            // TODO catch fileIO exception
             $jsonData = json_decode(file_get_contents($this->file), true);
+            if ($jsonData === null) {
+                throw new RuntimeException("invalid json for $this->file");
+            }
             $this->parseData($jsonData);
         } else {
             throw new RuntimeException("no file name for model/table $this->modelName/$this->tableName");
@@ -96,49 +99,49 @@ class ModelSchema
     /**
      * @param array $jsonData
      */
-    private function parseData(array $jsonData)
+    public function parseData(array $jsonData)
     {
+        if ($this->foreignKeyMap === null) {
+            $this->foreignKeyMap = new ForeignKeyMap();
+        }
+
         foreach ($jsonData as $field) {
-            $fieldType = self::getFieldType($field);
-
-            if ($fieldType == 'field' || $fieldType == 'primary') {
-                // fields are indexed for simpler search later
+            if ($fieldPart = $this->getFieldPart($field)) {
                 $fieldName = $field['name'];
-                $this->fields[$fieldName] = $field;
+                $this->fields[$fieldName] = $fieldPart;
 
-                if ($fieldType == 'primary') {
-                    // TODO handle primary key inconsistency exception
-                    $this->setPrimaryKey($field['name']);
+            }
+            if ($primaryPart = $this->isPrimary($field)) {
+                // TODO handle primary key inconsistency exception
+                $this->setPrimaryKey($primaryPart['name']);
+            }
+            if ($relationPart = $this->getRelationPart($field)) {
+                $this->parseRelationship($relationPart);
+                $this->relationships[] = $relationPart;
+                if ($this->createRelationInverse) {
+                    $this->appendInverseRelationship($relationPart);
                 }
-
-            } elseif ($fieldType == 'relation') {
-                $this->parseRelationship($field);
-            } else {
-                throw new RuntimeException("wrong field type inside $this->file: \n"
-                    . json_encode($field));
             }
         }
     }
 
-    /**
-     * @param array $field
-     * @return string
-     */
-    private static function getFieldType(array $field)
+    private static function getFieldPart(array $field)
     {
-        if (isset($field['primary'])) {
-            return 'primary';
+        dump($field);
+        if(isset($field['dbType'])){
+            $field['dbType'] = explode(':foreign', $field['dbType'])[0];
         }
+        return array_except($field, ['type', 'relation']);
+    }
 
-        if (isset($field['relation'])) {
-            return 'relation';
-        }
+    private static function isPrimary(array $field)
+    {
+        return isset($field['primary']);
+    }
 
-        if (isset($field['name'])) {
-            return 'field';
-        }
-
-        return '';
+    private static function getRelationPart(array $field)
+    {
+        return array_only($field, ['type', 'relation', 'dbType']);
     }
 
     /**
@@ -146,8 +149,8 @@ class ModelSchema
      */
     private function parseRelationship(array $field)
     {
-        dump($this->modelName);
-        $relationInputs = explode(',', $field['relation']);
+        $relation = array_pull($field, 'relation');
+        $relationInputs = explode(',', $relation);
 
         $relationType = array_shift($relationInputs);
         $relatedModel = array_shift($relationInputs);
@@ -162,7 +165,7 @@ class ModelSchema
                 'refModel' => $relatedModel,
                 'localKey' => $foreignKey,
                 'otherKey' => $otherKey,
-            ]);
+            ], $field);
 
         } elseif ($relationType == '1tm' || $relationType == '1t1') {
             // hasOne and hasMany relations
@@ -177,42 +180,41 @@ class ModelSchema
             ], $field);
         } elseif ($relationType == 'mtm') {
             // belongsToMany relations
-            $pivotModel = array_pull($field, 'pivotModel'); // can be null
-            if ($pivotModel === null) {
-                $pivotModel = min($this->modelName, $relatedModel).' '.max($this->modelName, $relatedModel);
-                self::$pivotHasModel[$pivotModel] = false;
-            } else {
-                self::$pivotHasModel[$pivotModel] = true;
-            }
-            if(!$this->foreignKeyMap->hasModel($pivotModel))
-                $this->foreignKeyMap->registerModel($pivotModel);
 
             $pivotTable = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
 
+
+            $pivotModel = array_pull($field, 'pivotModel'); // can be null
+            if ($pivotModel === null) {
+                $this->command->pivots[] = new ModelSchema(null, $pivotModel, $pivotTable);
+                $pivotModel = min($this->modelName, $relatedModel) . ' ' . max($this->modelName, $relatedModel);
+                if (!$this->foreignKeyMap->hasModel($pivotModel)) {
+                    $this->foreignKeyMap->registerModel($pivotModel);
+                }
+            }
+
             $localConfig = [
                 'model' => $pivotModel,
                 'refModel' => $this->modelName,
-                'otherKey' => $foreignKey,
-                'table' => $pivotTable,
+                'localKey' => $foreignKey,
             ];
 
             $otherConfig = [
                 'model' => $pivotModel,
                 'refModel' => $relatedModel,
-                'otherKey' => $otherKey,
-                'table' => $pivotTable,
+                'localKey' => $otherKey,
             ];
 
-            $this->updateForeignKeyFromRelation($otherConfig);
-            $this->updateForeignKeyFromRelation($localConfig);
+            $this->updateForeignKeyFromRelation($otherConfig, $field);
+            $this->updateForeignKeyFromRelation($localConfig, $field);
         }
     }
 
     private function updateForeignKeyFromRelation($fkSettings, $fieldSettings = [])
     {
-        $this->foreignKeyMap->updateOrStoreForeignKey($fkSettings, $fieldSettings, false);
+        $this->foreignKeyMap->updateOrStoreForeignKey($fkSettings, $fieldSettings);
     }
 
     public function appendInverseRelationship($relationship)
@@ -226,4 +228,22 @@ class ModelSchema
         $foreignKeyMap->registerModel($this->modelName);
     }
 
+    public function compileSchema()
+    {
+        $foreignKeyMigrationText = [];
+
+        /** @var  SchemaForeignKey[] $localForeignKeys */
+        $localForeignKeys = $this->foreignKeyMap->getForeignKeys($this->modelName);
+        foreach ($localForeignKeys as $foreignKey) {
+            $name = $foreignKey->localKey;
+            $this->fields[$foreignKey->localKey] =
+                $foreignKey->getFieldRepresentation($this->fields[$name]);
+            if (ModelSchema::SEPARATE_FOREIGN_MIGRATION) {
+                $dbType = explode(':foreign', $this->fields[$foreignKey->localKey]['dbType']);
+                $foreignKeyMigrationText[] = 'foreign'.$dbType[1];
+                $this->fields[$foreignKey->localKey]['dbType'] = $dbType[0];
+            }
+        }
+        return ['fields' => $this->fields, 'foreignKeys' => $foreignKeyMigrationText];
+    }
 }

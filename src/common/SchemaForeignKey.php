@@ -4,84 +4,67 @@ namespace Motia\Generator\Common;
 
 class SchemaForeignKey
 {
+    /** @var  ForeignKeyMap */
+    public $foreignKeyMap;
+
+    public $defaulted;
     /** @var  string */
     public $model;
     public $refModel;
+    public $refTable;
     public $localKey;
     public $otherKey;
-    public $table;
-    public $refTable;
 
-    /** @var array */
-    public $fieldSettings = [];
-    public $errors = [];
-    /** @var  ForeignKeyMap */
-    public $foreignKeyMap;
     /** @var  string */
     private $onUpdate;
     private $onDelete;
 
-
-    /**
-     * SchemaForeignKey constructor.
-     * @param $foreignKeyMap
-     */
-    public function __construct($foreignKeyMap = null)
+    public function __construct()
     {
-        $this->foreignKeyMap = $foreignKeyMap;
+        $this->defaulted = array_fill_keys(['localKey', 'otherKey', 'refTable', 'onUpdate', 'onDelete'], true);
     }
 
-    public function parseForeignKey($keySettings, $fieldSettings = [], $overrideFieldSettings = false)
+    public function parseForeignKey($keySettings, $fieldSettings = [])
     {
         if (isset($keySettings)) {
+            $this->model = array_pull($keySettings, 'model');
+            $this->refModel = array_pull($keySettings, 'refModel');
+
             foreach ($keySettings as $key => $value) {
-                if ($this->checkForInconsistency($key, $value, 'from-relation')) {
-                    $this->$key = $value;
-                }
+                $this->updateDefaulted($key, $value);
             }
         }
-
         $dbInput = array_pull($fieldSettings, 'dbType');
-
-        // checking for table name and primary key consistency
-        // perhaps I can add checking for foreign key type consistency
         if (isset($dbInput)) {
-            $dbInputs = explode(',', $dbInput);
+            $dbInputs = explode(':', $dbInput);
             foreach ($dbInputs as $input) {
-                if (str_contains($input, 'foreign')) {
+                $option = explode(':', $input)[0];
+                if ($option == 'foreign') {
                     $tokens = explode(',', $input);
-                    $length = count($tokens);
-                    if ($length > 1) {
-                        $this->checkForInconsistency('refTable', $tokens[1], 'from-settings');
-                        $this->refTable = $tokens[1];
-                    }
-                    if ($length > 2) {
-                        $this->checkForInconsistency('otherKey', $tokens[2], 'from-settings');
-                        $this->refTable = $tokens[2];
-                    }
+                    $this->updateDefaulted('refTable', $tokens[1]);
+                    $this->updateDefaulted('otherKey', $tokens[2]);
+                } elseif ($option == 'onUpdate') {
+                    $this->onUpdate = substr($input, strlen('onUpdate:'));
+                } elseif ($option == 'onDelete') {
+                    $this->onDelete = substr($input, strlen('onDelete:'));
                 }
             }
-        }
-
-        if ($overrideFieldSettings) {
-            $this->fieldSettings = array_merge($this->fieldSettings, $fieldSettings);
-        } else {
-            $this->fieldSettings = array_merge($fieldSettings, $this->fieldSettings);
         }
     }
 
-    private function checkForInconsistency($member, $value, $context)
+    private function updateDefaulted($key, $value)
     {
-        $error = isset($this->$member) && $this->$member != ModelSchema::$wildCard && $this->$member != $value;
-        if ($error) {
-            $this->errors[] = [
-                'context' => 'foreign-key-' . $context,
-                'member' => $member,
-                'old' => $this->$member,
-                'new' => $value
-            ];
+        if ($this->isUpdatable($key, $value)) {
+            $this->$key = $value;
+            $this->defaulted[$key] = false;
+        } else {
+            // notify for inconsistency
         }
-        return !$error;
+    }
+
+    private function isUpdatable($key, $value)
+    {
+        return $this->defaulted[$key] && $value != ModelSchema::WILD_CARD;
     }
 
     public function fillPlaceHolders()
@@ -89,8 +72,47 @@ class SchemaForeignKey
         // todo
     }
 
-    public function getFieldRepresentation()
+    public function getFieldRepresentation(array $field = [], $separated = false)
     {
-        // todo
+        // todo verify for consistency
+        if (isset($field['name'])) {
+            $this->updateDefaulted('localKey', $field['name']);
+        }
+        /** @var ModelSchema $refSchema */
+        $refSchema = $this->foreignKeyMap->command->schemas[$this->refModel];
+        $refTable = ($this->defaulted['refTable']) ? $refSchema->tableName : $this->refTable;
+        $primary = ($this->defaulted['otherKey']) ? $refSchema->getPrimaryKey() : $this->otherKey;
+
+        if ($this->defaulted['localKey']) {
+            $this->localKey = $refTable . '_' . $primary;
+        }
+
+        $type = 'unsigned';
+        if (isset($field['dbType'])) {
+            $type = $field['dbType'];
+        } else {
+            if (isset($refSchema->fields[$primary])) {
+                $type = $refSchema->fields[$primary];
+                if ($type == 'increments' || $type == 'integer,true,true')
+                    $type = 'unsigned';
+            }
+        }
+
+        $result = [
+            'name' => $this->localKey,
+            'dbType' => $type,
+        ];
+        if ($separated) {
+            $result['foreignKey'] = [
+                'field' => $this->localKey,
+                'references' => $primary,
+                'on' => $refTable,
+                'onUpdate' => $this->onUpdate,
+                'onDelete' => $this->onDelete
+            ];
+        } else
+            $result['dbType'] .= ':' . implode(',', ['foreign', $refTable, $primary]);
+
+        return $result;
     }
 }
