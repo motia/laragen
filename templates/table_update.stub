@@ -1,0 +1,3 @@
+        Schema::table('$TABLE_NAME$', function (Blueprint $table) {
+            $FIELDS$
+        });
