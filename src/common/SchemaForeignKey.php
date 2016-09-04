@@ -50,6 +50,14 @@ class SchemaForeignKey
                 }
             }
         }
+
+        if($this->defaulted['localKey']) {
+            $this->localKey = snake_case($this->localKey) . '_' . 'id';
+        }
+        if($this->defaulted['otherKey']) {
+            $this->otherKey = 'id';
+        }
+
     }
 
     private function updateDefaulted($key, $value)
@@ -78,13 +86,14 @@ class SchemaForeignKey
         if (isset($field['name'])) {
             $this->updateDefaulted('localKey', $field['name']);
         }
+
         /** @var ModelSchema $refSchema */
         $refSchema = $this->foreignKeyMap->command->schemas[$this->refModel];
         $refTable = ($this->defaulted['refTable']) ? $refSchema->tableName : $this->refTable;
         $primary = ($this->defaulted['otherKey']) ? $refSchema->getPrimaryKey() : $this->otherKey;
 
         if ($this->defaulted['localKey']) {
-            $this->localKey = $refTable . '_' . $primary;
+            $this->localKey = snake_case($this->refModel) . '_' . $primary;
         }
 
         $type = 'unsigned';
@@ -108,7 +117,7 @@ class SchemaForeignKey
                 'references' => $primary,
                 'on' => $refTable,
                 'onUpdate' => $this->onUpdate,
-                'onDelete' => $this->onDelete
+                'onDelete' => $this->onDelete,
             ];
         } else
             $result['dbType'] .= ':' . implode(',', ['foreign', $refTable, $primary]);

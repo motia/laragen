@@ -4,6 +4,7 @@
 namespace Motia\Generator\Common;
 
 use Illuminate\Support\Str;
+use Motia\Generator\Commands\GenerateAllCommand;
 use Symfony\Component\Console\Exception\RuntimeException;
 
 
@@ -15,7 +16,7 @@ class ModelSchema
     /** @var bool[] */
     /** @var ForeignKeyMap */
     public $foreignKeyMap;
-    /** @var  $command */
+    /** @var  GenerateAllCommand $command */
     public $command;
 
     /**
@@ -116,10 +117,10 @@ class ModelSchema
                 $this->setPrimaryKey($primaryPart['name']);
             }
             if ($relationPart = $this->getRelationPart($field)) {
-                $this->parseRelationship($relationPart);
-                $this->relationships[] = $relationPart;
+                $relation = $this->parseRelationField($relationPart);
+                $this->relationships[] = $relation;
                 if ($this->createRelationInverse) {
-                    $this->appendInverseRelationship($relationPart);
+                    $this->appendInverseRelationship($relation);
                 }
             }
         }
@@ -127,11 +128,12 @@ class ModelSchema
 
     private static function getFieldPart(array $field)
     {
-        dump($field);
-        if(isset($field['dbType'])){
+        if (isset($field['dbType'])) {
             $field['dbType'] = explode(':foreign', $field['dbType'])[0];
+            return array_except($field, ['type', 'relation']);
+        } else {
+            return null;
         }
-        return array_except($field, ['type', 'relation']);
     }
 
     private static function isPrimary(array $field)
@@ -141,13 +143,16 @@ class ModelSchema
 
     private static function getRelationPart(array $field)
     {
-        return array_only($field, ['type', 'relation', 'dbType']);
+        if (isset($field['relation'])) {
+            return array_only($field, ['type', 'relation', 'dbType']);
+        }
+        return null;
     }
 
     /**
      * @param array $field
      */
-    private function parseRelationship(array $field)
+    private function parseRelationField(array $field)
     {
         $relation = array_pull($field, 'relation');
         $relationInputs = explode(',', $relation);
@@ -155,32 +160,42 @@ class ModelSchema
         $relationType = array_shift($relationInputs);
         $relatedModel = array_shift($relationInputs);
 
-        if (!isset($field['type']) && ($relationType == '1t1' || $relationType == 'mt1')) {
+        if ($relationType == 'mt1') {
             // belongsTo relations
             $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
 
-            $this->updateForeignKeyFromRelation([
+            $fk = $this->updateForeignKeyFromRelation([
                 'model' => $this->modelName,
                 'refModel' => $relatedModel,
                 'localKey' => $foreignKey,
                 'otherKey' => $otherKey,
             ], $field);
 
+            return [
+                'type' => $relationType,
+                'related' => $relatedModel,
+                'foreign' => $fk,
+            ];
         } elseif ($relationType == '1tm' || $relationType == '1t1') {
             // hasOne and hasMany relations
             $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
 
-            $this->updateForeignKeyFromRelation([
+            $fk = $this->updateForeignKeyFromRelation([
                 'model' => $relatedModel,
                 'refModel' => $this->modelName,
                 'localKey' => $foreignKey,
                 'otherKey' => $otherKey,
             ], $field);
+
+            return [
+                'type' => $relationType,
+                'related' => $relatedModel,
+                'foreign' => $fk,
+            ];
         } elseif ($relationType == 'mtm') {
             // belongsToMany relations
-
             $pivotTable = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
@@ -188,11 +203,16 @@ class ModelSchema
 
             $pivotModel = array_pull($field, 'pivotModel'); // can be null
             if ($pivotModel === null) {
-                $this->command->pivots[] = new ModelSchema(null, $pivotModel, $pivotTable);
-                $pivotModel = min($this->modelName, $relatedModel) . ' ' . max($this->modelName, $relatedModel);
-                if (!$this->foreignKeyMap->hasModel($pivotModel)) {
+                $pivotModel = min($this->modelName, $relatedModel) . '##' . max($this->modelName, $relatedModel);
+
+                $pivotSchema = new ModelSchema(null, $pivotModel, $pivotTable);
+                if ($this->foreignKeyMap !== null) {
+                    $pivotSchema->foreignKeyMap = $this->foreignKeyMap;
                     $this->foreignKeyMap->registerModel($pivotModel);
                 }
+
+                $this->command->schemas[$pivotModel] = $pivotSchema;
+                $this->command->pivots[] = $pivotSchema->modelName;
             }
 
             $localConfig = [
@@ -207,19 +227,42 @@ class ModelSchema
                 'localKey' => $otherKey,
             ];
 
-            $this->updateForeignKeyFromRelation($otherConfig, $field);
-            $this->updateForeignKeyFromRelation($localConfig, $field);
+            $fk1 = $this->updateForeignKeyFromRelation($otherConfig, $field);
+            $fk2 = $this->updateForeignKeyFromRelation($localConfig, $field);
+
+            return [
+                'type' => $relationType,
+                'related' => $relatedModel,
+                'foreign' => [$fk1, $fk2],
+            ];
         }
+        return null;
     }
 
     private function updateForeignKeyFromRelation($fkSettings, $fieldSettings = [])
     {
-        $this->foreignKeyMap->updateOrStoreForeignKey($fkSettings, $fieldSettings);
+        return $this->foreignKeyMap->updateOrStoreForeignKey($fkSettings, $fieldSettings);
     }
 
     public function appendInverseRelationship($relationship)
     {
-        //todo
+        $type = $relationship['type'];
+        $related = $relationship['related'];
+        $foreign = $relationship['foreign'];
+        if (is_array($foreign)) {
+            $foreign = array_reverse($foreign);
+        }
+        foreach ($this->command->schemas[$related]->relationships as $other) {
+            if ($other['type'] == strrev($type) && $other['related'] == $this->modelName) {
+                return;
+            }
+        }
+
+        $this->command->schemas[$related]->relationships[] = [
+            'type' => strrev($type),
+            'related' => $this->modelName,
+            'foreign' => $foreign,
+        ];
     }
 
     public function registerForeignKeyMap(ForeignKeyMap $foreignKeyMap)
@@ -236,14 +279,53 @@ class ModelSchema
         $localForeignKeys = $this->foreignKeyMap->getForeignKeys($this->modelName);
         foreach ($localForeignKeys as $foreignKey) {
             $name = $foreignKey->localKey;
+            if (isset($this->fields[$name])) {
+                $field = $this->fields[$name];
+            } else {
+                $field = [];
+            }
             $this->fields[$foreignKey->localKey] =
-                $foreignKey->getFieldRepresentation($this->fields[$name]);
+                $foreignKey->getFieldRepresentation($field, ModelSchema::SEPARATE_FOREIGN_MIGRATION);
             if (ModelSchema::SEPARATE_FOREIGN_MIGRATION) {
-                $dbType = explode(':foreign', $this->fields[$foreignKey->localKey]['dbType']);
-                $foreignKeyMigrationText[] = 'foreign'.$dbType[1];
-                $this->fields[$foreignKey->localKey]['dbType'] = $dbType[0];
+                $foreignKeyMigrationText[] = array_pull($this->fields[$foreignKey->localKey], 'foreignKey');
             }
         }
-        return ['fields' => $this->fields, 'foreignKeys' => $foreignKeyMigrationText];
+
+        $relations = [];
+        foreach ($this->relationships as $relationship) {
+            $relationText = $relationship['type'] . ',' . $relationship['related'];
+            if (in_array($relationship['type'], ['1t1', '1tm', 'mt1'])) {
+                $fk = $relationship['foreign'];
+                if (!$fk->defaulted['otherKey']) {
+                    $relationText .= ',' . $fk->localKey . ',' . $fk->otherKey;
+                } else {
+                    if (!$fk->defaulted['localKey']) {
+                        $relationText .= ',' . $fk->localKey;
+                    }
+                }
+            } elseif ($relationship['type'] == 'mtm') {
+                list($fk1, $fk2) = $relationship['foreign'];
+                $pivotTable = $this->command->schemas[$fk2->model]->tableName;
+                $relationText .= ',' . $pivotTable;
+                if (!$fk2->defaulted['localKey']) {
+                    $relationText .= ',' . $fk1->localKey . ',' . $fk2->localKey;
+                } elseif (!$fk1->defaulted['localKey']) {
+                    $relationText .= ',' . $fk1->localKey;
+                }
+            }
+
+            if ($relationship['type'] != 'mt1') {
+                $relation['type'] = 'relation';
+                $relations[] = [
+                    'type' => 'relation',
+                    'relation' => $relationText,
+                ];
+            } else {
+                $localKey = $relationship['foreign']->localKey;
+                $this->fields[$localKey]['relation'] = $relationText;
+            }
+        }
+
+        return ['fields' => array_merge($relations, $this->fields), 'foreignKeys' => $foreignKeyMigrationText];
     }
 }

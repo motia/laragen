@@ -5,6 +5,7 @@ namespace Motia\Generator\Common;
 
 class ForeignKeyMap
 {
+    public $command; // todo
     private $map = [];
 
     public function getMap()
@@ -12,13 +13,9 @@ class ForeignKeyMap
         return $this->map;
     }
 
-    public function store($model, $foreignKey)
-    {
-        $this->map[$model][] = $foreignKey;
-    }
-
     public function registerModel($model){
-        $this->map[$model] = [];
+        if(!key_exists($model, $this->map))
+            $this->map[$model] = [];
     }
 
     public function hasModel($model)
@@ -43,8 +40,7 @@ class ForeignKeyMap
         return null;
     }
 
-
-    public function updateOrStoreForeignKey($fkSettings, $fieldSettings, $overrideFieldSettings = false)
+    public function updateOrStoreForeignKey($fkSettings, $fieldSettings)
     {
         $model = $fkSettings['model'];
         $refModel = $fkSettings['refModel'];
@@ -52,15 +48,20 @@ class ForeignKeyMap
         /** @var SchemaForeignKey[] $foreignKeys */
         foreach ($foreignKeys as $fk) {
             if ($fk->refModel == $refModel) {
-                $fk->parseForeignKey($fkSettings, $fieldSettings, $overrideFieldSettings);
-                return true;
+                $fk->parseForeignKey($fkSettings, $fieldSettings);
+                return $fk;
             }
         }
         $fk = new SchemaForeignKey();
-        $fk->parseForeignKey($fkSettings, $fieldSettings, $overrideFieldSettings);
+        $fk->parseForeignKey($fkSettings, $fieldSettings);
 
+        $fk->foreignKeyMap = $this;
         $this->map[$model][] = $fk;
 
-        return false;
+        return $fk;
+    }
+    
+    public function getForeignKeys($model){
+        return $this->map[$model];
     }
 }

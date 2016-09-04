@@ -5,35 +5,38 @@ namespace Motia\Generator\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Composer;
 use Illuminate\Filesystem\Filesystem;
+use InfyOm\Generator\Utils\FileUtil;
 use Motia\Generator\Common\ForeignKeyMap;
 use Motia\Generator\Common\ModelSchema;
 use Motia\Generator\Generators\ForeignKeysMigrationGenerator;
 
 class GenerateAllCommand extends Command
 {
+    use ArtisanCommandTrait;
+    /**
+     * @var ModelSchema[]
+     */
+    public $schemas;
+    public $pivots = [];
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
     protected $signature = 'motia:generate';
-
     /**
      * The console command description.
      *
      * @var string
      */
     protected $description = 'generates models and migration from json files';
-
     /** @var Composer */
     protected $composer;
-
     /** @var Filesystem */
     protected $filesystem;
     /**
-     * @var ModelSchema[]
+     * @var ForeignKeyMap
      */
-    protected $schemas;
     protected $foreignKeyMap;
 
     /**
@@ -125,15 +128,31 @@ class GenerateAllCommand extends Command
     // fills the schemas and tableFkOptions attributes
     public function compileModelSchemas()
     {
-
-        foreach ($this->schemas as &$schema) {
+        foreach ($this->schemas as $schema) {
             $schema->parseDataFromFile();
         }
 
-        dump('_________________________________');
-        dump('schema compiled');
-        die(dump($this->foreignKeyMap->getMap()));
-        dd();
+        $tableForeignKeys = [];
+        $modelSchemas = [];
+        foreach ($this->schemas as &$schema) {
+            $compileResults = $schema->compileSchema();
+            $modelSchemas[$schema->modelName] = $compileResults['fields'];
+            if (!empty($compileResults['foreignKeys'])) {
+                $tableForeignKeys[$schema->tableName] = $compileResults['foreignKeys'];
+            }
+        }
+
+
+        return array($modelSchemas, $tableForeignKeys);
+    }
+
+    public function generateForeignKeyMigration($tableForeignKeys)
+    {
+        $fkMigrationGenerator = new ForeignKeysMigrationGenerator($tableForeignKeys);
+        $file = $fkMigrationGenerator->generate();
+
+        $this->comment("\nMigration created: ");
+        $this->info($file);
     }
 
     public function createPrimaryKey($fieldName)
@@ -148,15 +167,5 @@ class GenerateAllCommand extends Command
             'inForm' => false,
             'inIndex' => false,
         ];
-    }
-
-    public function generateForeignKeyMigration()
-    {
-        // TODO adapt to ForeignKeysMigrationGenerator package changes
-        $fkMigrationGenerator = new ForeignKeysMigrationGenerator($this->foreignKeyMap);
-        $file = $fkMigrationGenerator->generate();
-
-        $this->comment("\nMigration created: ");
-        $this->info($file);
     }
 }
