@@ -1,34 +1,28 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: M
- * Date: 8/6/2016
- * Time: 1:21 AM.
- */
+
 namespace Motia\Generator\Generators;
 
-use InfyOm\Generator\Common\CommandData;
 use InfyOm\Generator\Utils\FileUtil;
 use InfyOm\Generator\Utils\SchemaUtil;
-use InfyOm\Generator\Utils\TemplateUtil;
 
 class ForeignKeysMigrationGenerator
 {
-    /** @var CommandData */
-    private $tableFKsOptions;
 
+    /*
     /** @var string */
     private $path;
+    /** @var  array */
+    private $tableForeignKeys;
 
-    public function __construct($tableFKsOptions)
+    public function __construct($tableForeignKeys)
     {
-        $this->tableFKsOptions = $tableFKsOptions;
+        $this->tableForeignKeys = $tableForeignKeys;
         $this->path = config('infyom.laravel_generator.path.migration', base_path('database/migrations/'));
     }
 
     public function generate()
     {
-        $templateData = TemplateUtil::getTemplate('relationships.foreign_key_Migration', 'laravel-generator');
+        $templateData = $this->getTemplate('foreign_key_migration');
 
         $tables = $this->generateTables();
 
@@ -50,7 +44,7 @@ class ForeignKeysMigrationGenerator
         $upTables = [];
         $downTables = [];
 
-        foreach ($this->tableFKsOptions as $table => $FKOptions) {
+        foreach ($this->tableForeignKeys as $table => $FKOptions) {
             $upTables[] = $this->generateUpTable($table);
             $downTables[] = $this->generateDownTable($table);
         }
@@ -68,12 +62,12 @@ class ForeignKeysMigrationGenerator
 
     private function generateUpTable($table)
     {
-        $templateData = TemplateUtil::getTemplate('relationships.table_update', 'laravel-generator');
+        $templateData = $this->getTemplate('table_update');
         $templateData = str_replace('$TABLE_NAME$', $table, $templateData);
 
         $fields = [];
 
-        foreach ($this->tableFKsOptions[$table] as $FKOption) {
+        foreach ($this->tableForeignKeys[$table] as $FKOption) {
             $field = $this->createAddForeignKeyField($FKOption);
             $fields[] = SchemaUtil::createField($field);
         }
@@ -85,24 +79,31 @@ class ForeignKeysMigrationGenerator
 
     public function createAddForeignKeyField($fkOptions)
     {
+        $migrationText = 'foreign:references,'."'".$fkOptions['references']."'"
+        .':on,'."'".$fkOptions['on']."'";
+
+        if (isset($fkOptions['onUpdate'])) {
+            $migrationText .= ':onUpdate,'."'".$fkOptions['onUpdate']."'";
+        }
+        if (isset($fkOptions['onDelete'])) {
+            $migrationText .= ':onDelete,'."'".$fkOptions['onDelete']."'";
+        }
+        
         return [
             'fieldName'      => $fkOptions['field'],
-            'databaseInputs' => 'foreign:references,'."'".$fkOptions['references']."'"
-                .':on,'."'".$fkOptions['on']."'"
-                .':onUpdate,'."'".$fkOptions['onUpdate']."'"
-                .':onDelete,'."'".$fkOptions['onDelete']."'",
+            'databaseInputs' => $migrationText
         ];
     }
 
     private function generateDownTable($table)
     {
-        $templateData = TemplateUtil::getTemplate('relationships.table_update', 'laravel-generator');
+        $templateData = $this->getTemplate('table_update');
         $templateData = str_replace('$TABLE_NAME$', $table, $templateData);
 
         $fields = [];
 
-        foreach ($this->tableFKsOptions[$table] as $FKOption) {
-            $field = $this->createDropForeignKeyField($FKOption);
+        foreach ($this->tableForeignKeys[$table] as $FKOption) {
+            $field = $this->createDropForeignKeyField($table, $FKOption);
             $fields[] = SchemaUtil::createField($field);
         }
 
@@ -112,12 +113,16 @@ class ForeignKeysMigrationGenerator
         return $templateData;
     }
 
-    public function createDropForeignKeyField($fkOptions)
+    public function createDropForeignKeyField($table, $fkOptions)
     {
-        $constraintName = $fkOptions['table'].'_'.$fkOptions['field'].'_foreign';
+        $constraintName = $table.'_'.$fkOptions['field'].'_foreign';
         return [
             'fieldName'      => $constraintName,
             'databaseInputs' => 'dropForeign',
         ];
+    }
+
+    private function getTemplate($template){
+        return file_get_contents(base_path('vendor/motia/laragen/templates/'. $template .'.stub'));
     }
 }
