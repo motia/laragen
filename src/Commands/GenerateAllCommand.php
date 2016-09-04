@@ -62,53 +62,55 @@ class GenerateAllCommand extends Command
         $generatorAddOns = ['swagger' => false, 'datatable' => false];
 
         $schemaFilesDirectory = 'resources/model_schemas/';
+        $compiledFilesDirectory = $schemaFilesDirectory . 'compiled/';
         $schemaFiles = $this->filesystem->glob($schemaFilesDirectory . '*.json');
 
         $this->foreignKeyMap = new ForeignKeyMap();
+        $this->foreignKeyMap->command = $this; //todo refactor
+
         foreach ($schemaFiles as $file) {
             $modelSchema = new ModelSchema($file);
             $modelSchema->registerForeignKeyMap($this->foreignKeyMap);
+            $modelSchema->command = $this;
 
             $this->schemas[$modelSchema->modelName] = $modelSchema;
         }
 
+
         $this->deleteObsoleteMigrationFiles();
-        $this->compileModelSchemas();
+        list($modelFields, $tableForeignKeys) = $this->compileModelSchemas();
 
-        foreach ($this->schemas as $schema) {
-            // TODO skip models,repositories for pivot tables
-            $modelName = $schema->modelName;
-            $tableName = $schema->tableName;
-            $fields = $schema->fields;
-            //$relationships = $schema->relationships;
+        foreach ($modelFields as $modelName => $fields) {
+            $tableName = $this->schemas[$modelName]->tableName;
+            $fields = $modelFields[$modelName];
 
-            $jsonData = [
-                'migrate' => false,
-                'fields' => $fields,
-                //  'relationships' => $relationships,
-                'tableName' => $tableName,
-                'options' => $generatorOptions,
-                'addOns' => $generatorAddOns,
-            ];
+            FileUtil::createFile($compiledFilesDirectory, $modelName . '.json', json_encode($fields));
 
             $options = [
                 'model' => $modelName,
-                '--jsonFromGUI' => json_encode($jsonData),
+                '--fieldsFile' => $compiledFilesDirectory . $modelName . '.json',
+                '--tableName' => $tableName,
+                '--skip' => 'dump-autoload',
+                '-n' => null,
             ];
-
-            $this->call($command, $options);
+            if (in_array($modelName, $this->pivots)) {
+                //$this->call('infyom:migration', $options);
+                $output = $this->executeArtisanCommand('infyom:migration', $options);
+            } else {
+                //$this->call($command, $options);
+                $output = $this->executeArtisanCommand($command, $options);
+            }
+            $this->info($output);
         }
 
-        // todo adapt FKMigrationGenerator to changes
-        //$this->generateForeignKeyMigration();
+        $this->generateForeignKeyMigration($tableForeignKeys);
         // todo check for an option to migrate after finishing ALL generation or after each stage
         //$this->call('migrate', []);
 
-
         $this->info('Generating autoload files');
 
-
         $this->composer->dumpOptimized();
+        return;
     }
 
     public function deleteObsoleteMigrationFiles()
