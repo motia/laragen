@@ -200,17 +200,18 @@ class ModelSchema
             $foreignKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
             $otherKey = (empty($relationInputs)) ? null : array_shift($relationInputs);
 
-
             $pivotModel = array_pull($field, 'pivotModel'); // can be null
             if ($pivotModel === null) {
-                $pivotModel = min($this->modelName, $relatedModel) . '##' . max($this->modelName, $relatedModel);
-
+                // todo maybe option
+                $pivotModel = min($this->modelName, $relatedModel) . max($this->modelName, $relatedModel) . 'Pivot';
+                if($pivotTable === null)
+                    $pivotTable = snake_case(str_singular(min($this->modelName, $relatedModel)).
+                        str_singular(max($this->modelName, $relatedModel)));
                 $pivotSchema = new ModelSchema(null, $pivotModel, $pivotTable);
                 if ($this->foreignKeyMap !== null) {
                     $pivotSchema->foreignKeyMap = $this->foreignKeyMap;
                     $this->foreignKeyMap->registerModel($pivotModel);
                 }
-
                 $this->command->schemas[$pivotModel] = $pivotSchema;
                 $this->command->pivots[] = $pivotSchema->modelName;
             }
@@ -218,14 +219,19 @@ class ModelSchema
             $localConfig = [
                 'model' => $pivotModel,
                 'refModel' => $this->modelName,
-                'localKey' => $foreignKey,
             ];
+            if (!empty($foreignKey)) {
+                $localConfig['localKey'] = $foreignKey;
+            }
 
             $otherConfig = [
                 'model' => $pivotModel,
                 'refModel' => $relatedModel,
-                'localKey' => $otherKey,
             ];
+
+            if (!empty($otherKeyKey)) {
+                $otherConfig['localKey'] = $otherKey;
+            }
 
             $fk1 = $this->updateForeignKeyFromRelation($otherConfig, $field);
             $fk2 = $this->updateForeignKeyFromRelation($localConfig, $field);
@@ -286,8 +292,11 @@ class ModelSchema
             }
             $this->fields[$foreignKey->localKey] =
                 $foreignKey->getFieldRepresentation($field, ModelSchema::SEPARATE_FOREIGN_MIGRATION);
+
             if (ModelSchema::SEPARATE_FOREIGN_MIGRATION) {
+                dump('rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr');
                 $foreignKeyMigrationText[] = array_pull($this->fields[$foreignKey->localKey], 'foreignKey');
+                dump('gggggggggggggggggggggggggggggggggggggggggg');
             }
         }
 
@@ -306,6 +315,7 @@ class ModelSchema
             } elseif ($relationship['type'] == 'mtm') {
                 list($fk1, $fk2) = $relationship['foreign'];
                 $pivotTable = $this->command->schemas[$fk2->model]->tableName;
+
                 $relationText .= ',' . $pivotTable;
                 if (!$fk2->defaulted['localKey']) {
                     $relationText .= ',' . $fk1->localKey . ',' . $fk2->localKey;
@@ -313,7 +323,6 @@ class ModelSchema
                     $relationText .= ',' . $fk1->localKey;
                 }
             }
-
             if ($relationship['type'] != 'mt1') {
                 $relation['type'] = 'relation';
                 $relations[] = [
@@ -327,5 +336,22 @@ class ModelSchema
         }
 
         return ['fields' => array_merge($relations, $this->fields), 'foreignKeys' => $foreignKeyMigrationText];
+    }
+
+
+    public function createPrimary()
+    {
+        $this->primaryKey = 'id';
+        return [
+            'name' => $this->primaryKey, // todo default option
+            'dbType' => 'increments',
+            'htmlType' => '',
+            'validations' => '',
+            'searchable' => false,
+            'fillable' => false,
+            'primary' => true,
+            'inForm' => false,
+            'inIndex' => false
+        ];
     }
 }

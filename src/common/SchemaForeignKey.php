@@ -15,13 +15,16 @@ class SchemaForeignKey
     public $localKey;
     public $otherKey;
 
+    public $dbType;
     /** @var  string */
     private $onUpdate;
     private $onDelete;
 
-    public function __construct()
+    public function __construct($foreignKeyMap)
     {
-        $this->defaulted = array_fill_keys(['localKey', 'otherKey', 'refTable', 'onUpdate', 'onDelete'], true);
+        $this->defaulted = array_fill_keys(['localKey', 'otherKey', 'refTable', 'dbType', 'onUpdate', 'onDelete'],
+            true);
+        $this->foreignKeyMap = $foreignKeyMap;
     }
 
     public function parseForeignKey($keySettings, $fieldSettings = [])
@@ -51,11 +54,19 @@ class SchemaForeignKey
             }
         }
 
-        if($this->defaulted['localKey']) {
-            $this->localKey = snake_case($this->localKey) . '_' . 'id';
+        if ($this->defaulted['localKey']) {
+            $this->localKey = snake_case($this->refModel) . '_' . 'id';
         }
-        if($this->defaulted['otherKey']) {
-            $this->otherKey = 'id';
+        if ($this->defaulted['otherKey']) {
+            /** @var ModelSchema $refSchema */
+            $refSchema = $this->foreignKeyMap->command->schemas[$this->refModel];
+            if($refSchema->getPrimaryKey() === null){
+                $refSchema->createPrimary();
+            }
+            $this->otherKey = $refSchema->getPrimaryKey();
+        }
+        if ($this->defaulted['dbType']) {
+            $this->dbType = 'unsigned';
         }
 
     }
@@ -96,16 +107,20 @@ class SchemaForeignKey
             $this->localKey = snake_case($this->refModel) . '_' . $primary;
         }
 
-        $type = 'unsigned';
-        if (isset($field['dbType'])) {
-            $type = $field['dbType'];
-        } else {
-            if (isset($refSchema->fields[$primary])) {
-                $type = $refSchema->fields[$primary];
-                if ($type == 'increments' || $type == 'integer,true,true')
-                    $type = 'unsigned';
+        $type = $this->dbType;
+        if ($this->defaulted['dbType']) {
+            if (isset($field['dbType'])) {
+                $type = $field['dbType'];
+            } else {
+                if (isset($refSchema->fields[$primary])) {
+                    $type = $refSchema->fields[$primary]['dbType'];
+                    if ($type == 'increments' || $type == 'integer,true,true') {
+                        $type = 'unsigned';
+                    }
+                }
             }
         }
+
 
         $result = [
             'name' => $this->localKey,
@@ -119,9 +134,11 @@ class SchemaForeignKey
                 'onUpdate' => $this->onUpdate,
                 'onDelete' => $this->onDelete,
             ];
-        } else
+        } else {
             $result['dbType'] .= ':' . implode(',', ['foreign', $refTable, $primary]);
+        }
 
+        dump($result);
         return $result;
     }
 }

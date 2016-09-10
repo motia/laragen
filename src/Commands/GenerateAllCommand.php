@@ -58,11 +58,16 @@ class GenerateAllCommand extends Command
     {
         // generation configuration for all models
         $command = 'infyom:api_scaffold';
+        // todo option
         $generatorOptions = ['paginate' => '15', 'skip' => 'dump-autoload'];
+        // todo option
         $generatorAddOns = ['swagger' => false, 'datatable' => false];
 
+        // todo option
         $schemaFilesDirectory = 'resources/model_schemas/';
+        // todo option
         $compiledFilesDirectory = $schemaFilesDirectory . 'compiled/';
+
         $schemaFiles = $this->filesystem->glob($schemaFilesDirectory . '*.json');
 
         $this->foreignKeyMap = new ForeignKeyMap();
@@ -77,21 +82,22 @@ class GenerateAllCommand extends Command
         }
 
 
-        $this->deleteObsoleteMigrationFiles();
+        // ToDo option
+        //$this->deleteObsoleteMigrationFiles();
         list($modelFields, $tableForeignKeys) = $this->compileModelSchemas();
 
         foreach ($modelFields as $modelName => $fields) {
             $tableName = $this->schemas[$modelName]->tableName;
             $fields = $modelFields[$modelName];
 
-            FileUtil::createFile($compiledFilesDirectory, $modelName . '.json', json_encode($fields));
+            FileUtil::createFile($compiledFilesDirectory, $modelName . '.json', json_encode(array_values($fields)));
 
             $options = [
                 'model' => $modelName,
                 '--fieldsFile' => $compiledFilesDirectory . $modelName . '.json',
                 '--tableName' => $tableName,
                 '--skip' => 'dump-autoload',
-                '-n' => null,
+                '-n' => null, // todo option
             ];
             if (in_array($modelName, $this->pivots)) {
                 //$this->call('infyom:migration', $options);
@@ -104,13 +110,46 @@ class GenerateAllCommand extends Command
         }
 
         $this->generateForeignKeyMigration($tableForeignKeys);
-        // todo check for an option to migrate after finishing ALL generation or after each stage
+        // todo option
         //$this->call('migrate', []);
 
         $this->info('Generating autoload files');
 
         $this->composer->dumpOptimized();
         return;
+    }
+
+    public function compileModelSchemas()
+    {
+        foreach ($this->schemas as $schema) {
+            $schema->parseDataFromFile();
+        }
+
+        $tableForeignKeys = [];
+        $modelSchemas = [];
+        foreach ($this->schemas as &$schema) {
+            dump($schema->modelName);
+            $compileResults = $schema->compileSchema();
+            dump('compiled');
+            $modelSchemas[$schema->modelName] = $compileResults['fields'];
+            dump('saved');
+            if (!empty($compileResults['foreignKeys'])) {
+                $tableForeignKeys[$schema->tableName] = $compileResults['foreignKeys'];
+            }
+        }
+
+        return array($modelSchemas, $tableForeignKeys);
+    }
+
+    // fills the schemas and tableFkOptions attributes
+
+    public function generateForeignKeyMigration($tableForeignKeys)
+    {
+        $fkMigrationGenerator = new ForeignKeysMigrationGenerator($tableForeignKeys);
+        $file = $fkMigrationGenerator->generate();
+
+        $this->comment("\nMigration created: ");
+        $this->info($file);
     }
 
     public function deleteObsoleteMigrationFiles()
@@ -125,49 +164,5 @@ class GenerateAllCommand extends Command
                 $this->filesystem->delete($migrationFile);
             }
         }
-    }
-
-    // fills the schemas and tableFkOptions attributes
-    public function compileModelSchemas()
-    {
-        foreach ($this->schemas as $schema) {
-            $schema->parseDataFromFile();
-        }
-
-        $tableForeignKeys = [];
-        $modelSchemas = [];
-        foreach ($this->schemas as &$schema) {
-            $compileResults = $schema->compileSchema();
-            $modelSchemas[$schema->modelName] = $compileResults['fields'];
-            if (!empty($compileResults['foreignKeys'])) {
-                $tableForeignKeys[$schema->tableName] = $compileResults['foreignKeys'];
-            }
-        }
-
-
-        return array($modelSchemas, $tableForeignKeys);
-    }
-
-    public function generateForeignKeyMigration($tableForeignKeys)
-    {
-        $fkMigrationGenerator = new ForeignKeysMigrationGenerator($tableForeignKeys);
-        $file = $fkMigrationGenerator->generate();
-
-        $this->comment("\nMigration created: ");
-        $this->info($file);
-    }
-
-    public function createPrimaryKey($fieldName)
-    {
-        return [
-            'fieldInput' => $fieldName . ':increments',
-            'htmlType' => '',
-            'validations' => '',
-            'searchable' => false,
-            'fillable' => false,
-            'primary' => true,
-            'inForm' => false,
-            'inIndex' => false,
-        ];
     }
 }

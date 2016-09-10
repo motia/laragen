@@ -52,10 +52,9 @@ class ForeignKeyMap
                 return $fk;
             }
         }
-        $fk = new SchemaForeignKey();
+        $fk = new SchemaForeignKey($this);
         $fk->parseForeignKey($fkSettings, $fieldSettings);
 
-        $fk->foreignKeyMap = $this;
         $this->map[$model][] = $fk;
 
         return $fk;
