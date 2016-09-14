@@ -1,5 +1,3 @@
-# Not Stable
-
 # Laragen
 
 Laragen is a API/Scaffold laravel generator package. It wraps the [laravel-generator](https://github.com/infyomlabs/laravel-generator/)  to add full schema generation and relationships support.
